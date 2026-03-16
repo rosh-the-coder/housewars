@@ -22,7 +22,7 @@ function normalizeHouseName(name: string | null | undefined): string {
 
 export function RootNav({ isLoggedIn, username, houseName, houseHex }: RootNavProps) {
   const pathname = usePathname();
-  if (pathname === "/welcome") {
+  if (pathname === "/welcome" || pathname === "/verify-email") {
     return null;
   }
 

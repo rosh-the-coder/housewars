@@ -49,8 +49,7 @@ export async function POST(request: Request) {
       return redirectWithMessage(request, "/signup", "error", signUpError.message);
     }
 
-    const userId = signUpData.user?.id;
-    if (!userId) {
+    if (!signUpData.user?.id) {
       return redirectWithMessage(
         request,
         "/signup",
@@ -58,8 +57,10 @@ export async function POST(request: Request) {
         "Check your email to confirm signup, then log in.",
       );
     }
-    const url = new URL("/welcome", request.url);
-    url.searchParams.set("user", userId);
+
+    const url = new URL("/verify-email", request.url);
+    url.searchParams.set("email", email);
+    url.searchParams.set("success", "Account created. Verify your email ID before signing in.");
     return NextResponse.redirect(url);
   } catch (error) {
     return redirectWithMessage(

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { inter } from "@/lib/fonts";
 
 type LoginPageProps = {
-  searchParams: Promise<{ error?: string; success?: string }>;
+  searchParams: Promise<{ error?: string; success?: string; info?: string }>;
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
@@ -29,6 +29,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             ) : null}
             {params.success ? (
               <p className="border border-green-300 bg-green-50 px-4 py-3 text-sm font-medium text-green-700">{params.success}</p>
+            ) : null}
+            {params.info ? (
+              <p className="border border-blue-300 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">{params.info}</p>
             ) : null}
 
             <form action="/api/auth/login" method="post" className="space-y-6">

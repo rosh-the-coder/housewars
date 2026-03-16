@@ -1,11 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { inter, oswald } from "@/lib/fonts";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-type WelcomePageProps = {
-  searchParams: Promise<{ user?: string }>;
-};
 
 type ProfileRow = {
   id: string;
@@ -35,22 +30,27 @@ function getHouseDisplay(name: string | null | undefined, fallbackHex: string | 
   };
 }
 
-export default async function WelcomePage({ searchParams }: WelcomePageProps) {
-  const params = await searchParams;
+export default async function WelcomePage() {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const targetUserId = user?.id ?? params.user;
-  if (!targetUserId) {
+  if (!user) {
     redirect("/login");
+  }
+
+  const welcomeSeen = Boolean(
+    (user.user_metadata as { welcome_seen?: boolean } | undefined)?.welcome_seen,
+  );
+  if (welcomeSeen) {
+    redirect("/dashboard");
   }
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("id,house:houses(name,hex_code)")
-    .eq("id", targetUserId)
+    .eq("id", user.id)
     .maybeSingle<ProfileRow>();
 
   if (!profile?.house) {
@@ -70,12 +70,14 @@ export default async function WelcomePage({ searchParams }: WelcomePageProps) {
         <p className={`${oswald.className} max-w-4xl text-3xl leading-tight tracking-[0.04em] text-black md:text-5xl`}>
           YOU HAVE BEEN ASSIGNED TO {house.name}
         </p>
-        <Link
-          href="/dashboard"
-          className={`${oswald.className} mt-3 inline-flex border-[3px] border-black bg-[#111111] px-10 py-4 text-xl tracking-[0.12em] text-[#F5F5F0] transition hover:opacity-90`}
-        >
-          ENTER THE WAR
-        </Link>
+        <form action="/api/auth/complete-welcome" method="post">
+          <button
+            type="submit"
+            className={`${oswald.className} mt-3 inline-flex border-[3px] border-black bg-[#111111] px-10 py-4 text-xl tracking-[0.12em] text-[#F5F5F0] transition hover:opacity-90`}
+          >
+            ENTER THE WAR
+          </button>
+        </form>
       </div>
     </section>
   );
