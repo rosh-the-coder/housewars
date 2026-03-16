@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { inter, jetMono } from "@/lib/fonts";
-import { HouseSelector } from "./house-selector";
 
 export const dynamic = "force-dynamic";
 
@@ -9,20 +7,8 @@ type SignupPageProps = {
   searchParams: Promise<{ error?: string; success?: string; info?: string }>;
 };
 
-type House = {
-  id: string;
-  name: string;
-  hex_code: string | null;
-};
-
 export default async function SignupPage({ searchParams }: SignupPageProps) {
   const params = await searchParams;
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("houses")
-    .select("id,name,hex_code")
-    .order("name", { ascending: true });
-  const houses = (data ?? []) as House[];
 
   return (
     <section className={`${inter.className} min-h-[calc(100vh-78px)] bg-[#111111]`}>
@@ -110,8 +96,6 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
                   />
                 </label>
               </div>
-
-              <HouseSelector houses={houses} />
 
               <button
                 type="submit"

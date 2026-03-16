@@ -14,7 +14,6 @@ export async function POST(request: Request) {
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
     const confirmPassword = String(formData.get("confirm_password") ?? "");
-    let houseId = String(formData.get("house_id") ?? "").trim();
 
     if (!username || !email || !password) {
       return redirectWithMessage(request, "/signup", "error", "Please fill all required fields.");
@@ -28,25 +27,11 @@ export async function POST(request: Request) {
 
     const supabase = await createSupabaseServerClient();
 
-    if (!houseId) {
-      const { data: firstHouse } = await supabase
-        .from("houses")
-        .select("id")
-        .order("name", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      houseId = firstHouse?.id ?? "";
-    }
-
-    if (!houseId) {
-      return redirectWithMessage(request, "/signup", "error", "No houses available to assign.");
-    }
-
     let { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { username, house_id: houseId },
+        data: { username },
       },
     });
 
@@ -73,30 +58,9 @@ export async function POST(request: Request) {
         "Check your email to confirm signup, then log in.",
       );
     }
-
-    // Some projects create profiles via DB trigger on auth.users insert.
-    // Only run fallback upsert when a session is present.
-    if (signUpData.session) {
-      const { error: profileError } = await supabase.from("profiles").upsert(
-        {
-          id: userId,
-          username,
-          house_id: houseId,
-        },
-        { onConflict: "id" },
-      );
-
-      if (profileError) {
-        return redirectWithMessage(request, "/signup", "error", profileError.message);
-      }
-    }
-
-    return redirectWithMessage(
-      request,
-      "/login",
-      "success",
-      "Account created. You can now log in and play.",
-    );
+    const url = new URL("/welcome", request.url);
+    url.searchParams.set("user", userId);
+    return NextResponse.redirect(url);
   } catch (error) {
     return redirectWithMessage(
       request,
