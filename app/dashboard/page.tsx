@@ -96,27 +96,6 @@ export default async function DashboardPage() {
 
   return (
     <section className="min-h-screen bg-[#1A1A1A] text-white">
-      <header className="flex h-14 items-center justify-between bg-[#DC2626] px-4 md:px-8">
-        <h1 className={`${oswald.className} text-2xl uppercase tracking-[0.08em]`}>HouseWars</h1>
-        <div className="flex items-center gap-3">
-          <p className={`${jetMono.className} hidden text-xs md:block`}>
-            {profile.username ?? user.email ?? "player"}
-          </p>
-          <div className="inline-flex items-center gap-1.5 rounded bg-[#0D0D0D] px-2.5 py-1">
-            <span
-              className="h-2 w-2"
-              style={{ background: profile.house?.hex_code ?? "#DC2626" }}
-            />
-            <span
-              className={`${jetMono.className} text-[10px] font-semibold`}
-              style={{ color: profile.house?.hex_code ?? "#DC2626" }}
-            >
-              {(profile.house?.name ?? "HOUSE").toUpperCase()}
-            </span>
-          </div>
-        </div>
-      </header>
-
       <div className="grid gap-0 lg:grid-cols-[1fr_280px]">
         <main className="space-y-8 p-4 md:p-8 md:px-10">
           <div className="grid gap-4 md:grid-cols-3 md:gap-6">
@@ -194,7 +173,7 @@ export default async function DashboardPage() {
           </div>
         </main>
 
-        <aside className="space-y-6 bg-[#212121] p-6 md:p-8 lg:min-h-[calc(100vh-56px)]">
+        <aside className="space-y-6 bg-[#212121] p-6 md:p-8 lg:min-h-[calc(100vh-68px)]">
           <h2 className={`${oswald.className} text-3xl uppercase leading-none`}>[ HOUSE_POINTS ]</h2>
           <div className="flex h-[520px] items-end justify-between gap-3 px-1">
             {houseBars.map((bar) => (

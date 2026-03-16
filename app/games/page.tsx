@@ -9,10 +9,13 @@ export const dynamic = "force-dynamic";
 type DbGame = {
   id: string;
   name: string;
+  thumbnail_url: string | null;
   embed_url: string;
   is_scored: boolean;
   is_active: boolean;
 };
+
+const TEST_GAME_EMBED_URL = "https://html5.gamedistribution.com/305d2a5605784aaf8587ffefc765e5cf/";
 
 export default async function GamesLobbyPage() {
   const supabase = await createSupabaseServerClient();
@@ -26,11 +29,18 @@ export default async function GamesLobbyPage() {
 
   const { data } = await supabase
     .from("games")
-    .select("id,name,embed_url,is_scored,is_active")
+    .select("id,name,thumbnail_url,embed_url,is_scored,is_active")
     .eq("is_active", true)
     .order("name", { ascending: true });
 
-  const games = (data ?? []) as DbGame[];
+  const games = ((data ?? []) as DbGame[]).sort((a, b) => {
+    const aIsTest = a.embed_url.startsWith(TEST_GAME_EMBED_URL);
+    const bIsTest = b.embed_url.startsWith(TEST_GAME_EMBED_URL);
+    if (aIsTest && !bIsTest) return -1;
+    if (!aIsTest && bIsTest) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
   const scoredGames = games.filter((game) => game.is_scored).length;
   const timedGames = games.filter((game) => !game.is_scored).length;
 
@@ -76,7 +86,16 @@ export default async function GamesLobbyPage() {
               key={game.id}
               className="overflow-hidden border-[3px] border-[#0D0D0D] bg-[#F5F5F0]"
             >
-              <div className="h-40 w-full bg-[#1A1A1A]" />
+              <div className="h-40 w-full bg-[#1A1A1A]">
+                {game.thumbnail_url ? (
+                  <img
+                    src={game.thumbnail_url}
+                    alt={`${game.name} thumbnail`}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                ) : null}
+              </div>
               <div className="space-y-2 p-4">
                 <h2 className={`${oswald.className} text-3xl uppercase leading-none`}>{game.name}</h2>
                 <span

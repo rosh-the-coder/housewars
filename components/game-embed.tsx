@@ -4,12 +4,14 @@ import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
-import { extractGameIdFromEmbedUrl } from "@/lib/gd";
+import { extractGameIdFromEmbedUrl, normalizeGameDistributionEmbedUrl } from "@/lib/gd";
 
 type GameEmbedProps = {
   embedUrl: string;
   title: string;
   sessionGameId: string;
+  showExitButton?: boolean;
+  iframeClassName?: string;
 };
 
 type GdEvent = {
@@ -26,9 +28,22 @@ declare global {
   }
 }
 
-export function GameEmbed({ embedUrl, title, sessionGameId }: GameEmbedProps) {
+export function GameEmbed({
+  embedUrl,
+  title,
+  sessionGameId,
+  showExitButton = true,
+  iframeClassName = "h-[520px] w-full rounded-lg border border-zinc-300 bg-black",
+}: GameEmbedProps) {
   const router = useRouter();
   const gameId = useMemo(() => extractGameIdFromEmbedUrl(embedUrl), [embedUrl]);
+  const normalizedEmbedUrl = useMemo(() => {
+    const fallbackReferrer = "http://localhost:3000/games";
+    if (typeof window === "undefined") {
+      return normalizeGameDistributionEmbedUrl(embedUrl, fallbackReferrer);
+    }
+    return normalizeGameDistributionEmbedUrl(embedUrl, window.location.href);
+  }, [embedUrl]);
   const sessionIdRef = useRef<string | null>(null);
   const isStartingRef = useRef(false);
   const isEndingRef = useRef(false);
@@ -150,6 +165,10 @@ export function GameEmbed({ embedUrl, title, sessionGameId }: GameEmbedProps) {
       return;
     }
 
+    // Some GD games don't emit SDK start events reliably in iframe mode.
+    // Start the session when the game page is opened, once per visit.
+    void startSession();
+
     window.GD_OPTIONS = {
       gameId,
       onEvent: async (event) => {
@@ -190,20 +209,22 @@ export function GameEmbed({ embedUrl, title, sessionGameId }: GameEmbedProps) {
   return (
     <>
       <Script src="https://html5.gamedistribution.com/HostAPI.js" strategy="afterInteractive" />
-      <div className="mb-3 flex items-center justify-end">
-        <button
-          type="button"
-          onClick={() => void endSession("manual")}
-          className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white"
-        >
-          Exit Game
-        </button>
-      </div>
+      {showExitButton ? (
+        <div className="mb-3 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={() => void endSession("manual")}
+            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white"
+          >
+            Exit Game
+          </button>
+        </div>
+      ) : null}
       <iframe
-        src={embedUrl}
+        src={normalizedEmbedUrl}
         title={`${title} game`}
-        className="h-[520px] w-full rounded-lg border border-zinc-300 bg-black"
-        allow="autoplay; fullscreen"
+        className={iframeClassName}
+        allow="autoplay; fullscreen; gamepad"
         allowFullScreen
       />
     </>
