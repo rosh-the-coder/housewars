@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { jetMono, oswald } from "@/lib/fonts";
+import { ensureSpeedTapGame, SPEED_TAP_EMBED_URL } from "@/lib/speed-tap";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { slugify } from "@/lib/slug";
 
@@ -27,6 +28,8 @@ export default async function GamesLobbyPage() {
     redirect("/login?error=Please log in first");
   }
 
+  await ensureSpeedTapGame(supabase);
+
   const { data } = await supabase
     .from("games")
     .select("id,name,thumbnail_url,embed_url,is_scored,is_active")
@@ -34,6 +37,11 @@ export default async function GamesLobbyPage() {
     .order("name", { ascending: true });
 
   const games = ((data ?? []) as DbGame[]).sort((a, b) => {
+    const aIsLocalSpeedTap = a.embed_url === SPEED_TAP_EMBED_URL;
+    const bIsLocalSpeedTap = b.embed_url === SPEED_TAP_EMBED_URL;
+    if (aIsLocalSpeedTap && !bIsLocalSpeedTap) return -1;
+    if (!aIsLocalSpeedTap && bIsLocalSpeedTap) return 1;
+
     const aIsTest = a.embed_url.startsWith(TEST_GAME_EMBED_URL);
     const bIsTest = b.embed_url.startsWith(TEST_GAME_EMBED_URL);
     if (aIsTest && !bIsTest) return -1;

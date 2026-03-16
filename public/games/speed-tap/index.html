@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Speed Tap</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        font-family: "Arial Black", Arial, sans-serif;
+        background: #f5f5f0;
+        color: #111111;
+      }
+
+      #app {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        border: 4px solid #111111;
+        background:
+          linear-gradient(180deg, #f5f5f0 0%, #f5f5f0 70%, #efeadd 100%);
+      }
+
+      .hud {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 12px;
+        background: #111111;
+        border: 3px solid #111111;
+        z-index: 10;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        color: #f5f5f0;
+        text-transform: uppercase;
+      }
+
+      .center {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        padding: 24px;
+        z-index: 12;
+        pointer-events: none;
+      }
+
+      #message {
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+      }
+
+      .panel {
+        width: min(680px, 92%);
+        background: #f5f5f0;
+        border: 4px solid #111111;
+        box-shadow: 10px 10px 0 #111111;
+        padding: 16px;
+      }
+
+      .panel h2 {
+        margin: 0 0 8px;
+        font-size: 24px;
+        letter-spacing: 0.03em;
+      }
+
+      .panel p {
+        margin: 0 0 10px;
+        font-family: Arial, sans-serif;
+        font-weight: 700;
+      }
+
+      .difficulty-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin: 10px 0 14px;
+      }
+
+      .difficulty-btn {
+        padding: 10px 8px;
+        border: 3px solid #111111;
+        background: #ffffff;
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      .difficulty-btn.active {
+        background: #111111;
+        color: #f5f5f0;
+      }
+
+      .start-btn {
+        width: 100%;
+        padding: 12px;
+        border: 3px solid #111111;
+        background: #ffd700;
+        font-size: 14px;
+        font-weight: 900;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      #instructionWrap {
+        display: none;
+        pointer-events: auto;
+      }
+
+      #instructionWrap .panel {
+        pointer-events: auto;
+      }
+
+      #ballsLayer {
+        position: absolute;
+        inset: 0;
+      }
+
+      .ball {
+        position: absolute;
+        width: 68px;
+        height: 68px;
+        border-radius: 999px;
+        display: none;
+        cursor: pointer;
+        border: 4px solid #111111;
+        box-shadow: 8px 8px 0 #111111;
+        z-index: 5;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="app">
+      <div class="hud">
+        <span id="roundText">Round: 0 / 10</span>
+        <span id="avgText">Average: - ms</span>
+      </div>
+      <div class="center">
+        <div id="message">WAITING FOR GAME TO START...</div>
+      </div>
+      <div class="center" id="instructionWrap">
+        <div class="panel">
+          <h2>SPEED TAP // BRIEFING</h2>
+          <p>Tap only your house-color target. Wrong taps cause penalties.</p>
+          <p id="difficultyText">Easy: one stationary target, safest points.</p>
+          <div class="difficulty-row">
+            <button class="difficulty-btn active" data-difficulty="easy">Easy</button>
+            <button class="difficulty-btn" data-difficulty="medium">Medium</button>
+            <button class="difficulty-btn" data-difficulty="hard">Hard</button>
+          </div>
+          <button class="start-btn" id="startBtn">Start Run (10 rounds)</button>
+        </div>
+      </div>
+      <div id="ballsLayer"></div>
+    </main>
+
+    <script>
+      (function () {
+        const TOTAL_ROUNDS = 10;
+        const SPAWN_DELAY_MS = 800;
+        const BALL_SIZE = 68;
+        const DIFFICULTY_CONFIG = {
+          easy: { decoys: 0, moving: false, wrongPenaltyMs: 0, failOnWrong: false },
+          medium: { decoys: 1, moving: true, wrongPenaltyMs: 500, failOnWrong: false },
+          hard: { decoys: 3, moving: true, wrongPenaltyMs: 1400, failOnWrong: true },
+        };
+
+        const app = document.getElementById("app");
+        const messageEl = document.getElementById("message");
+        const instructionWrapEl = document.getElementById("instructionWrap");
+        const difficultyTextEl = document.getElementById("difficultyText");
+        const startBtnEl = document.getElementById("startBtn");
+        const difficultyButtons = document.querySelectorAll(".difficulty-btn");
+        const roundTextEl = document.getElementById("roundText");
+        const avgTextEl = document.getElementById("avgText");
+        const ballsLayerEl = document.getElementById("ballsLayer");
+
+        let gameReady = false;
+        let started = false;
+        let currentRound = 0;
+        let reactionTimes = [];
+        let penaltyMs = 0;
+        let roundStartedAt = 0;
+        let pendingSpawnTimer = null;
+        let animFrame = null;
+        let difficulty = "easy";
+        let houseColor = "#22c55e";
+        let isRoundActive = false;
+        let balls = [];
+        let failedMode = false;
+
+        function updateDifficultyText() {
+          if (difficulty === "easy") {
+            difficultyTextEl.textContent = "Easy: one target, no wrong-click penalty.";
+          } else if (difficulty === "medium") {
+            difficultyTextEl.textContent = "Medium: moving decoy appears. Wrong tap adds +500ms penalty.";
+          } else {
+            difficultyTextEl.textContent = "Hard: 3 moving decoys. Wrong tap ends run and applies heavy penalty.";
+          }
+        }
+
+        function sendResult(avgReactionMs, wasFailedRun) {
+          const metricType = "time_" + difficulty + (wasFailedRun ? "_fail" : "");
+          window.parent.postMessage(
+            {
+              type: "HOUSEWARS_GAME_OVER",
+              payload: {
+                metric_value: avgReactionMs,
+                metric_type: metricType,
+              },
+            },
+            "*",
+          );
+        }
+
+        function updateHud() {
+          const played = reactionTimes.length;
+          const base = played === 0 ? 0 : reactionTimes.reduce((sum, t) => sum + t, 0);
+          const avg = played === 0 ? "-" : Math.round((base + penaltyMs) / played);
+          roundTextEl.textContent = "Round: " + currentRound + " / " + TOTAL_ROUNDS;
+          avgTextEl.textContent = "Average: " + avg + " ms";
+        }
+
+        function clearRoundVisuals() {
+          ballsLayerEl.innerHTML = "";
+          balls = [];
+          isRoundActive = false;
+          if (animFrame) {
+            cancelAnimationFrame(animFrame);
+            animFrame = null;
+          }
+        }
+
+        function finishGame(wasFailedRun) {
+          clearRoundVisuals();
+
+          const finishedRounds = reactionTimes.length;
+          const remainingRounds = Math.max(0, TOTAL_ROUNDS - finishedRounds);
+          const reactionTotal = reactionTimes.reduce((sum, t) => sum + t, 0);
+          const totalMs = reactionTotal + penaltyMs + remainingRounds * 2200;
+          const avgReactionMs = Math.round(totalMs / TOTAL_ROUNDS);
+
+          messageEl.textContent = wasFailedRun
+            ? "Run ended early. Avg reaction: " + avgReactionMs + " ms"
+            : "Done! Avg reaction: " + avgReactionMs + " ms";
+          sendResult(avgReactionMs, wasFailedRun);
+          started = false;
+          gameReady = false;
+        }
+
+        function randomInRange(min, max) {
+          return Math.random() * (max - min) + min;
+        }
+
+        function spawnBall(color, isTarget) {
+          const bounds = app.getBoundingClientRect();
+          const hudBottomOffset = 80;
+          const minX = 0;
+          const minY = hudBottomOffset;
+          const maxX = Math.max(minX, bounds.width - BALL_SIZE);
+          const maxY = Math.max(minY, bounds.height - BALL_SIZE);
+
+          const x = randomInRange(minX, maxX);
+          const y = randomInRange(minY, maxY);
+          const el = document.createElement("button");
+          el.className = "ball";
+          el.style.display = "block";
+          el.style.left = x + "px";
+          el.style.top = y + "px";
+          el.style.background = color;
+          el.setAttribute("aria-label", isTarget ? "Target ball" : "Decoy ball");
+          ballsLayerEl.appendChild(el);
+
+          const speedScale = difficulty === "hard" ? 1.8 : 1.15;
+          const vx = randomInRange(-1.8, 1.8) * speedScale;
+          const vy = randomInRange(-1.8, 1.8) * speedScale;
+          const ball = { el: el, x: x, y: y, vx: vx, vy: vy, isTarget: isTarget };
+          balls.push(ball);
+
+          el.addEventListener("click", function () {
+            if (!isRoundActive) return;
+            if (ball.isTarget) {
+              const reaction = Math.max(0, Math.round(performance.now() - roundStartedAt));
+              reactionTimes.push(reaction);
+              currentRound += 1;
+              clearRoundVisuals();
+              updateHud();
+
+              if (currentRound >= TOTAL_ROUNDS) {
+                finishGame(false);
+              } else {
+                nextRound();
+              }
+              return;
+            }
+
+            if (difficulty === "hard") {
+              penaltyMs += DIFFICULTY_CONFIG.hard.wrongPenaltyMs;
+              failedMode = true;
+              updateHud();
+              finishGame(true);
+              return;
+            }
+
+            penaltyMs += DIFFICULTY_CONFIG.medium.wrongPenaltyMs;
+            messageEl.textContent = "Wrong ball! +" + DIFFICULTY_CONFIG.medium.wrongPenaltyMs + "ms penalty";
+            updateHud();
+          });
+        }
+
+        function animateBalls() {
+          if (!isRoundActive) return;
+          const bounds = app.getBoundingClientRect();
+          const minX = 0;
+          const minY = 80;
+          const maxX = Math.max(minX, bounds.width - BALL_SIZE);
+          const maxY = Math.max(minY, bounds.height - BALL_SIZE);
+
+          for (let i = 0; i < balls.length; i += 1) {
+            const ball = balls[i];
+            if (difficulty !== "easy") {
+              ball.x += ball.vx;
+              ball.y += ball.vy;
+            }
+
+            if (ball.x <= minX || ball.x >= maxX) ball.vx *= -1;
+            if (ball.y <= minY || ball.y >= maxY) ball.vy *= -1;
+
+            ball.x = Math.max(minX, Math.min(maxX, ball.x));
+            ball.y = Math.max(minY, Math.min(maxY, ball.y));
+            ball.el.style.left = ball.x + "px";
+            ball.el.style.top = ball.y + "px";
+          }
+
+          animFrame = requestAnimationFrame(animateBalls);
+        }
+
+        function startRoundVisuals() {
+          clearRoundVisuals();
+          isRoundActive = true;
+          roundStartedAt = performance.now();
+
+          spawnBall(houseColor, true);
+
+          const config = DIFFICULTY_CONFIG[difficulty];
+          const decoyPalette = ["#ef4444", "#2563eb", "#ca8a04", "#7c3aed"];
+          for (let i = 0; i < config.decoys; i += 1) {
+            spawnBall(decoyPalette[i % decoyPalette.length], false);
+          }
+
+          animateBalls();
+        }
+
+        function nextRound() {
+          if (!started) return;
+          if (currentRound >= TOTAL_ROUNDS) {
+            finishGame(false);
+            return;
+          }
+          messageEl.textContent = "Round " + (currentRound + 1) + ": Tap your target";
+          if (pendingSpawnTimer) {
+            clearTimeout(pendingSpawnTimer);
+          }
+          pendingSpawnTimer = window.setTimeout(startRoundVisuals, SPAWN_DELAY_MS);
+        }
+
+        difficultyButtons.forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            const nextDifficulty = btn.getAttribute("data-difficulty");
+            if (!nextDifficulty) return;
+            difficulty = nextDifficulty;
+            difficultyButtons.forEach(function (x) {
+              x.classList.remove("active");
+            });
+            btn.classList.add("active");
+            updateDifficultyText();
+          });
+        });
+
+        startBtnEl.addEventListener("click", function () {
+          if (!gameReady || started) return;
+          instructionWrapEl.style.display = "none";
+          started = true;
+          failedMode = false;
+          currentRound = 0;
+          reactionTimes = [];
+          penaltyMs = 0;
+          updateHud();
+          messageEl.textContent = "Get ready...";
+          nextRound();
+        });
+
+        window.addEventListener("message", function (event) {
+          if (!event.data || typeof event.data !== "object") return;
+          if (event.data.type !== "HOUSEWARS_GAME_START") return;
+          if (gameReady || started) return;
+
+          const payload = event.data.payload || {};
+          if (typeof payload.house_color === "string" && payload.house_color.trim()) {
+            houseColor = payload.house_color;
+          }
+
+          gameReady = true;
+          started = false;
+          currentRound = 0;
+          reactionTimes = [];
+          penaltyMs = 0;
+          failedMode = false;
+          updateDifficultyText();
+          updateHud();
+          messageEl.textContent = "Choose difficulty and start your run";
+          instructionWrapEl.style.display = "grid";
+        });
+      })();
+    </script>
+  </body>
+</html>

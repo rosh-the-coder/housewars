@@ -1,6 +1,7 @@
 import { IBM_Plex_Mono, Playfair_Display, Space_Grotesk } from "next/font/google";
 import { notFound, redirect } from "next/navigation";
 import { GameEmbed } from "@/components/game-embed";
+import { ensureSpeedTapGame, SPEED_TAP_EMBED_URL } from "@/lib/speed-tap";
 import { slugify } from "@/lib/slug";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -82,6 +83,8 @@ export default async function GamePage({ params }: GamePageProps) {
     redirect("/login?error=Please log in first");
   }
 
+  await ensureSpeedTapGame(supabase);
+
   const { data } = await supabase
     .from("games")
     .select("id,name,source,type,embed_url,thumbnail_url,pts_per_minute,is_scored,is_active")
@@ -100,19 +103,32 @@ export default async function GamePage({ params }: GamePageProps) {
     .maybeSingle<ProfileRow>();
   const userProfile = profileAttempt.data;
   const userName = (userProfile?.username ?? user.email?.split("@")[0] ?? "player").toUpperCase();
+  const sdkPlayerName = userProfile?.username ?? user.email?.split("@")[0] ?? "player";
   const userHouseName = normalizeHouseName(userProfile?.house?.name);
   const userHouseColor = getHouseColor(userProfile?.house?.name, userProfile?.house?.hex_code);
+
+  const isSpeedTap = game.embed_url === SPEED_TAP_EMBED_URL;
+  const speedTapGameIds = games
+    .filter((row) => row.embed_url === SPEED_TAP_EMBED_URL)
+    .map((row) => row.id);
+  const sessionGameIds = isSpeedTap
+    ? Array.from(new Set([game.id, ...speedTapGameIds]))
+    : [game.id];
 
   const sessionsAttempt = await supabase
     .from("game_sessions")
     .select("user_id,raw_score,points_earned")
-    .eq("game_id", game.id)
+    .in("game_id", sessionGameIds)
     .not("ended_at", "is", null);
   const sessions = (sessionsAttempt.data ?? []) as SessionRow[];
 
   const userBestScore = sessions
     .filter((row) => row.user_id === user.id)
-    .reduce((max, row) => Math.max(max, Number(row.raw_score ?? 0)), 0);
+    .reduce(
+      (max, row) =>
+        Math.max(max, Number(isSpeedTap ? row.points_earned ?? 0 : row.raw_score ?? 0)),
+      0,
+    );
 
   const userIds = Array.from(new Set(sessions.map((row) => row.user_id)));
   const profilesById = new Map<string, ProfileRow>();
@@ -156,9 +172,24 @@ export default async function GamePage({ params }: GamePageProps) {
   }
 
   const difficulty = getDifficulty(game.pts_per_minute);
-  const pointsReward = `${(game.pts_per_minute ?? 10) * 15} PTS`;
+  const pointsReward = isSpeedTap ? "100 / 250 / 500 PTS" : `${(game.pts_per_minute ?? 10) * 15} PTS`;
   const gameType = (game.type ?? "timed").toUpperCase();
   const category = game.source?.toUpperCase() === "GAMEDISTRIBUTION" ? "ARCADE" : (game.source ?? "WEB").toUpperCase();
+  const howToPlay = isSpeedTap
+    ? [
+        "WAIT FOR GAME START THEN PICK EASY / MEDIUM / HARD",
+        "CLICK ONLY YOUR HOUSE-COLOR TARGET BALL",
+        "MEDIUM ADDS DECOYS + MOVEMENT, HARD FAILS ON WRONG TAP",
+        "FASTER REACTION + HIGHER DIFFICULTY = MORE POINTS",
+      ]
+    : [
+        "CLICK PLAY NOW TO START YOUR RUN",
+        game.is_scored
+          ? "SCORE AS HIGH AS POSSIBLE BEFORE EXITING"
+          : `EARN ${game.pts_per_minute ?? 10} POINTS PER MINUTE SURVIVED`,
+        "SESSION POINTS ARE ADDED TO YOUR HOUSE TOTAL",
+        "LEAVE THE GAME PAGE TO LOCK IN YOUR SESSION SCORE",
+      ];
 
   return (
     <section className="min-h-screen bg-[#F5F5F0]">
@@ -193,6 +224,13 @@ export default async function GamePage({ params }: GamePageProps) {
                   embedUrl={game.embed_url}
                   title={game.name}
                   sessionGameId={game.id}
+                  user={{
+                    username: sdkPlayerName,
+                    house: {
+                      name: userProfile?.house?.name ?? userHouseName,
+                      hex_code: userProfile?.house?.hex_code ?? userHouseColor,
+                    },
+                  }}
                   showExitButton={false}
                   iframeClassName="h-[495px] w-full border-0 bg-black"
                 />
@@ -220,14 +258,7 @@ export default async function GamePage({ params }: GamePageProps) {
               <div className="flex h-12 items-center bg-[#111111] px-5">
                 <p className={`${spaceGrotesk.className} text-[13px] font-bold tracking-[0.16em] text-white`}>HOW TO PLAY</p>
               </div>
-              {[
-                "CLICK PLAY NOW TO START YOUR RUN",
-                game.is_scored
-                  ? "SCORE AS HIGH AS POSSIBLE BEFORE EXITING"
-                  : `EARN ${game.pts_per_minute ?? 10} POINTS PER MINUTE SURVIVED`,
-                "SESSION POINTS ARE ADDED TO YOUR HOUSE TOTAL",
-                "LEAVE THE GAME PAGE TO LOCK IN YOUR SESSION SCORE",
-              ].map((text, idx) => (
+              {howToPlay.map((text, idx) => (
                 <div
                   key={text}
                   className={`flex h-[52px] items-center gap-4 px-5 ${idx < 3 ? "border-b-2 border-[#DDDDDD]" : ""}`}
@@ -249,10 +280,17 @@ export default async function GamePage({ params }: GamePageProps) {
               <p className={`${spaceGrotesk.className} text-[42px] leading-none font-bold tracking-[-0.03em] text-[#FFD700]`}>
                 {pointsReward}
               </p>
+              {isSpeedTap ? (
+                <p className={`${plexMono.className} text-[10px] font-semibold tracking-[0.08em] text-[#777777]`}>
+                  EASY / MEDIUM / HARD
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-2 border-b-[3px] border-[#111111] px-5 py-5">
-              <p className={`${plexMono.className} text-[10px] font-semibold tracking-[0.18em] text-[#777777]`}>YOUR BEST SCORE</p>
+              <p className={`${plexMono.className} text-[10px] font-semibold tracking-[0.18em] text-[#777777]`}>
+                {isSpeedTap ? "YOUR BEST RUN POINTS" : "YOUR BEST SCORE"}
+              </p>
               <p className={`${spaceGrotesk.className} text-[36px] leading-none font-bold text-[#111111]`}>
                 {toLocaleScore(userBestScore)}
               </p>
