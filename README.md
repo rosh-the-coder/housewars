@@ -1,5 +1,22 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Environment Setup
+
+Create a `.env.local` file in the project root before running the app:
+
+```bash
+cp .env.example .env.local
+```
+
+Fill these values from Supabase Dashboard -> Project Settings -> API:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+```
+
+After saving `.env.local`, restart the dev server.
+
 ## Getting Started
 
 First, run the development server:
