@@ -10,19 +10,19 @@ type HouseStanding = {
   id: string;
   name: string;
   hex_code: string | null;
-  total_points: number | null;
+  cp_total: number | null;
 };
 
 type ProfileRow = {
   id: string;
   username: string | null;
   house_id: string | null;
-  total_points: number | null;
+  ct_total: number | null;
   house: {
     id: string;
     name: string;
     hex_code: string | null;
-    total_points: number | null;
+    cp_total: number | null;
   } | null;
 };
 
@@ -47,14 +47,14 @@ export default async function DashboardPage() {
     await Promise.all([
       supabase
         .from("profiles")
-        .select("id,username,house_id,total_points,house:houses(id,name,hex_code,total_points)")
+        .select("id,username,house_id,ct_total,house:houses(id,name,hex_code,cp_total)")
         .eq("id", user.id)
         .maybeSingle<ProfileRow>(),
-      supabase.from("profiles").select("id,total_points").order("total_points", { ascending: false }),
+      supabase.from("profiles").select("id,ct_total").order("ct_total", { ascending: false }),
       supabase
         .from("houses")
-        .select("id,name,hex_code,total_points")
-        .order("total_points", { ascending: false }),
+        .select("id,name,hex_code,cp_total")
+        .order("cp_total", { ascending: false }),
       supabase
         .from("games")
         .select("id,name,is_scored,is_active")
@@ -80,12 +80,12 @@ export default async function DashboardPage() {
     ) || 1;
   const activeChallenges = 3;
 
-  const maxHousePoints = Math.max(...safeHouses.map((house) => Number(house.total_points ?? 0)), 1);
+  const maxHousePoints = Math.max(...safeHouses.map((house) => Number(house.cp_total ?? 0)), 1);
   const houseBars = safeHouses.map((house) => ({
     label: house.name.slice(0, 3).toUpperCase(),
-    value: Number(house.total_points ?? 0),
+    value: Number(house.cp_total ?? 0),
     color: house.hex_code ?? "#999999",
-    height: Math.max(90, Math.round((Number(house.total_points ?? 0) / maxHousePoints) * 220)),
+    height: Math.max(90, Math.round((Number(house.cp_total ?? 0) / maxHousePoints) * 220)),
   }));
 
   const statCards = [
@@ -174,7 +174,7 @@ export default async function DashboardPage() {
         </main>
 
         <aside className="space-y-6 bg-[#212121] p-6 md:p-8 lg:min-h-[calc(100vh-68px)]">
-          <h2 className={`${oswald.className} text-3xl uppercase leading-none`}>[ HOUSE_POINTS ]</h2>
+          <h2 className={`${oswald.className} text-3xl uppercase leading-none`}>[ HOUSE_CP ]</h2>
           <div className="flex h-[520px] items-end justify-between gap-3 px-1">
             {houseBars.map((bar) => (
               <div key={bar.label} className="flex h-full w-full flex-col items-center justify-end gap-2">

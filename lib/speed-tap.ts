@@ -11,40 +11,39 @@ type BasicGameRow = {
   is_active: boolean;
 };
 
-type SupabaseLike = {
-  from: (table: string) => {
-    select: (
-      columns: string,
-    ) => {
-      eq: (
-        column: string,
-        value: string,
-      ) => Promise<{ data: BasicGameRow[] | null; error: { message?: string } | null }>;
+type GamesTableApi = {
+  select: (columns: string) => {
+    eq: (column: string, value: string) => PromiseLike<unknown>;
+  };
+  insert: (payload: Record<string, unknown>) => {
+    select: (columns: string) => {
+      single: <T>() => PromiseLike<{ data: T | null; error: { message?: string } | null }>;
     };
-    insert: (payload: Record<string, unknown>) => {
-      select: (columns: string) => {
-        single: <T>() => Promise<{ data: T | null; error: { message?: string } | null }>;
-      };
-    };
-    update: (payload: Record<string, unknown>) => {
-      eq: (column: string, value: string) => Promise<{ error: { message?: string } | null }>;
-    };
+  };
+  update: (payload: Record<string, unknown>) => {
+    eq: (column: string, value: string) => PromiseLike<unknown>;
   };
 };
 
-export async function ensureSpeedTapGame(supabase: SupabaseLike): Promise<void> {
-  const existing = await supabase
-    .from("games")
+type MinimalSupabase = {
+  from: (table: string) => unknown;
+};
+
+export async function ensureSpeedTapGame(supabase: MinimalSupabase): Promise<void> {
+  const games = supabase.from("games") as GamesTableApi;
+  const existing = (await games
     .select("id,name,thumbnail_url,embed_url,is_scored,is_active")
-    .eq("embed_url", SPEED_TAP_EMBED_URL);
+    .eq("embed_url", SPEED_TAP_EMBED_URL)) as {
+    data: BasicGameRow[] | null;
+    error: { message?: string } | null;
+  };
 
   const matches = existing.data ?? [];
 
   if (matches.length > 0) {
     const primary = matches.find((row) => row.is_active) ?? matches[0];
 
-    await supabase
-      .from("games")
+    await games
       .update({
         name: SPEED_TAP_NAME,
         thumbnail_url: SPEED_TAP_THUMBNAIL,
@@ -52,6 +51,7 @@ export async function ensureSpeedTapGame(supabase: SupabaseLike): Promise<void> 
         source: "custom",
         type: "scored",
         pts_per_minute: 0,
+        difficulty_multiplier: 1.0,
         is_scored: true,
         is_active: true,
       })
@@ -59,14 +59,13 @@ export async function ensureSpeedTapGame(supabase: SupabaseLike): Promise<void> 
 
     for (const duplicate of matches) {
       if (duplicate.id === primary.id) continue;
-      await supabase.from("games").update({ is_active: false }).eq("id", duplicate.id);
+      await games.update({ is_active: false }).eq("id", duplicate.id);
     }
 
     return;
   }
 
-  await supabase
-    .from("games")
+  await games
     .insert({
       name: SPEED_TAP_NAME,
       thumbnail_url: SPEED_TAP_THUMBNAIL,
@@ -74,6 +73,7 @@ export async function ensureSpeedTapGame(supabase: SupabaseLike): Promise<void> 
       source: "custom",
       type: "scored",
       pts_per_minute: 0,
+      difficulty_multiplier: 1.0,
       is_scored: true,
       is_active: true,
     })

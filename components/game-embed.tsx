@@ -29,6 +29,8 @@ type HouseWarsGameOverMessage = {
 
 type SessionEndPayload = {
   points_earned?: number;
+  ct_earned?: number;
+  cp_earned?: number;
   rank?: number | string | null;
   house_color?: string;
 };
@@ -47,8 +49,9 @@ export function GameEmbed({
   const isStartingRef = useRef(false);
   const isEndingRef = useRef(false);
   const [iframeKey, setIframeKey] = useState(0);
-  const [result, setResult] = useState<{ points: number; rank: string | number }>({
-    points: 0,
+  const [result, setResult] = useState<{ ct: number; cp: number; rank: string | number }>({
+    ct: 0,
+    cp: 0,
     rank: "-",
   });
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
@@ -113,7 +116,8 @@ export function GameEmbed({
 
       const payload = (await response.json()) as SessionEndPayload;
       setResult({
-        points: Number(payload.points_earned ?? 0),
+        ct: Number(payload.ct_earned ?? payload.points_earned ?? 0),
+        cp: Number(payload.cp_earned ?? payload.points_earned ?? 0),
         rank: payload.rank ?? "-",
       });
       setIsResultModalOpen(true);
@@ -203,14 +207,18 @@ export function GameEmbed({
           <div className="w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-950 p-6 text-white shadow-2xl">
             <h3 className="text-xl font-bold">Run Complete</h3>
             <p className="mt-2 text-zinc-300">Session submitted successfully.</p>
-            <div className="mt-6 grid grid-cols-2 gap-4">
+            <div className="mt-6 grid grid-cols-3 gap-4">
               <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-4">
                 <p className="text-xs uppercase tracking-wide text-zinc-400">Rank</p>
                 <p className="mt-1 text-2xl font-bold">{result.rank}</p>
               </div>
               <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-4">
-                <p className="text-xs uppercase tracking-wide text-zinc-400">Points</p>
-                <p className="mt-1 text-2xl font-bold">{result.points}</p>
+                <p className="text-xs uppercase tracking-wide text-zinc-400">CT Earned</p>
+                <p className="mt-1 text-2xl font-bold">{result.ct}</p>
+              </div>
+              <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-4">
+                <p className="text-xs uppercase tracking-wide text-zinc-400">CP Contributed</p>
+                <p className="mt-1 text-2xl font-bold">{result.cp}</p>
               </div>
             </div>
             <div className="mt-6 flex items-center justify-end gap-3">

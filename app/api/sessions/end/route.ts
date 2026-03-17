@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
+import { resolveBasePoints, resolveCpFromBase } from "@/lib/points";
 import { slugify } from "@/lib/slug";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -18,25 +19,8 @@ type GameRow = {
   name: string;
   is_scored: boolean;
   pts_per_minute: number | null;
+  difficulty_multiplier: number | null;
 };
-
-function resolveTimeMetricPoints(metricValue: number, metricType: string): number {
-  const normalizedType = metricType.toLowerCase();
-  const avgReactionMs = Math.max(0, metricValue);
-  const cap = normalizedType.includes("_hard")
-    ? 500
-    : normalizedType.includes("_medium")
-      ? 250
-      : 100;
-  const failedRun = normalizedType.includes("_fail");
-
-  const reactionRatio = Math.max(0, Math.min(1, (1500 - avgReactionMs) / 1200));
-  const floorRatio = failedRun ? 0 : 0.2;
-  const scaled = cap * (floorRatio + (1 - floorRatio) * reactionRatio);
-  const penalized = failedRun ? scaled * 0.35 : scaled;
-
-  return Math.max(0, Math.min(cap, Math.round(penalized)));
-}
 
 async function resolveHouseInfo(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, userId: string) {
   const profileAttempt = await supabase
@@ -103,6 +87,8 @@ export async function POST(request: Request) {
     if (session.ended_at) {
       return NextResponse.json({
         points_earned: session.points_earned ?? 0,
+        ct_earned: session.points_earned ?? 0,
+        cp_earned: session.points_earned ?? 0,
         house_color: "#DC2626",
         already_ended: true,
       });
@@ -110,7 +96,7 @@ export async function POST(request: Request) {
 
     const { data: game, error: gameError } = await supabase
       .from("games")
-      .select("id,name,is_scored,pts_per_minute")
+      .select("id,name,is_scored,pts_per_minute,difficulty_multiplier")
       .eq("id", session.game_id)
       .single<GameRow>();
 
@@ -126,26 +112,19 @@ export async function POST(request: Request) {
       Math.floor((Date.now() - new Date(session.started_at).getTime()) / 1000),
     );
 
-    const metricValue = Number(metricValueInput);
-    const hasMetric = Number.isFinite(metricValue);
     const metricType = String(metricTypeInput ?? "").trim().toLowerCase();
-
-    let pointsFromMetric: number | null = null;
-    let rawScore = Number(session.raw_score ?? 0);
-    if (hasMetric) {
-      if (metricType.startsWith("time")) {
-        pointsFromMetric = resolveTimeMetricPoints(metricValue, metricType);
-        rawScore = pointsFromMetric * 10;
-      } else {
-        rawScore = Math.max(0, Math.round(metricValue));
-      }
-    }
-
-    const pointsEarned =
-      pointsFromMetric ??
-      (game.is_scored
-        ? Math.min(Math.floor(rawScore / 10), 500)
-        : Math.floor(durationSeconds / 60) * Number(game.pts_per_minute ?? 0));
+    const { basePoints, rawScore } = resolveBasePoints({
+      metricValue: metricValueInput,
+      metricType,
+      fallbackRawScore: Number(session.raw_score ?? 0),
+      isScored: game.is_scored,
+      durationSeconds,
+      ptsPerMinute: Number(game.pts_per_minute ?? 0),
+    });
+    const ctEarned = basePoints;
+    const multiplier = Number(game.difficulty_multiplier ?? 1);
+    const cpEarned = resolveCpFromBase(basePoints, multiplier);
+    const pointsEarned = ctEarned;
 
     const { error: updateError } = await supabase
       .from("game_sessions")
@@ -154,6 +133,10 @@ export async function POST(request: Request) {
         duration_seconds: durationSeconds,
         raw_score: rawScore,
         points_earned: pointsEarned,
+        base_points: basePoints,
+        ct_earned: ctEarned,
+        cp_earned: cpEarned,
+        difficulty_multiplier_snapshot: multiplier,
       })
       .eq("id", session.id);
 
@@ -170,10 +153,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const { error: awardError } = await supabase.rpc("award_points", {
+    const { error: awardError } = await supabase.rpc("award_dual_points", {
       p_user_id: user.id,
       p_house_id: houseId,
-      p_points: pointsEarned,
+      p_base_points: basePoints,
+      p_multiplier: multiplier,
+      p_ct_points: ctEarned,
+      p_cp_points: cpEarned,
     });
 
     if (awardError) {
@@ -182,8 +168,8 @@ export async function POST(request: Request) {
 
     const rankAttempt = await supabase
       .from("profiles")
-      .select("id,total_points")
-      .order("total_points", { ascending: false });
+      .select("id,ct_total,total_points")
+      .order("ct_total", { ascending: false });
     const rank =
       (rankAttempt.data ?? []).findIndex(
         (row) => (row as { id?: string }).id === user.id,
@@ -196,6 +182,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       points_earned: pointsEarned,
+      ct_earned: ctEarned,
+      cp_earned: cpEarned,
+      multiplier,
       rank: rank > 0 ? rank : null,
       house_color: houseColor,
     });

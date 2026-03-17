@@ -23,6 +23,7 @@ type DbGame = {
   embed_url: string;
   thumbnail_url: string | null;
   pts_per_minute: number | null;
+  difficulty_multiplier: number | null;
   is_scored: boolean;
   is_active: boolean;
 };
@@ -31,16 +32,24 @@ type SessionRow = {
   user_id: string;
   raw_score: number | null;
   points_earned: number | null;
+  ct_earned: number | null;
+  cp_earned: number | null;
 };
 
 type ProfileRow = {
   id: string;
   username: string | null;
   house_id: string | null;
-  house: {
-    name: string;
-    hex_code: string | null;
-  } | null;
+  house:
+    | {
+        name: string;
+        hex_code: string | null;
+      }[]
+    | {
+        name: string;
+        hex_code: string | null;
+      }
+    | null;
 };
 
 function normalizeHouseName(name: string | null | undefined): string {
@@ -87,7 +96,7 @@ export default async function GamePage({ params }: GamePageProps) {
 
   const { data } = await supabase
     .from("games")
-    .select("id,name,source,type,embed_url,thumbnail_url,pts_per_minute,is_scored,is_active")
+    .select("id,name,source,type,embed_url,thumbnail_url,pts_per_minute,difficulty_multiplier,is_scored,is_active")
     .eq("is_active", true);
   const games = (data ?? []) as DbGame[];
   const game = games.find((item) => slugify(item.name) === slug);
@@ -102,10 +111,11 @@ export default async function GamePage({ params }: GamePageProps) {
     .eq("id", user.id)
     .maybeSingle<ProfileRow>();
   const userProfile = profileAttempt.data;
+  const currentHouse = Array.isArray(userProfile?.house) ? userProfile?.house[0] : userProfile?.house;
   const userName = (userProfile?.username ?? user.email?.split("@")[0] ?? "player").toUpperCase();
   const sdkPlayerName = userProfile?.username ?? user.email?.split("@")[0] ?? "player";
-  const userHouseName = normalizeHouseName(userProfile?.house?.name);
-  const userHouseColor = getHouseColor(userProfile?.house?.name, userProfile?.house?.hex_code);
+  const userHouseName = normalizeHouseName(currentHouse?.name);
+  const userHouseColor = getHouseColor(currentHouse?.name, currentHouse?.hex_code);
 
   const isSpeedTap = game.embed_url === SPEED_TAP_EMBED_URL;
   const speedTapGameIds = games
@@ -117,7 +127,7 @@ export default async function GamePage({ params }: GamePageProps) {
 
   const sessionsAttempt = await supabase
     .from("game_sessions")
-    .select("user_id,raw_score,points_earned")
+    .select("user_id,raw_score,points_earned,ct_earned,cp_earned")
     .in("game_id", sessionGameIds)
     .not("ended_at", "is", null);
   const sessions = (sessionsAttempt.data ?? []) as SessionRow[];
@@ -126,7 +136,10 @@ export default async function GamePage({ params }: GamePageProps) {
     .filter((row) => row.user_id === user.id)
     .reduce(
       (max, row) =>
-        Math.max(max, Number(isSpeedTap ? row.points_earned ?? 0 : row.raw_score ?? 0)),
+        Math.max(
+          max,
+          Number(isSpeedTap ? row.ct_earned ?? row.points_earned ?? 0 : row.raw_score ?? 0),
+        ),
       0,
     );
 
@@ -146,14 +159,15 @@ export default async function GamePage({ params }: GamePageProps) {
   const houseTotals = new Map<string, { houseName: string; color: string; points: number }>();
   for (const row of sessions) {
     const profile = profilesById.get(row.user_id);
-    const houseName = normalizeHouseName(profile?.house?.name);
+    const house = Array.isArray(profile?.house) ? profile?.house[0] : profile?.house;
+    const houseName = normalizeHouseName(house?.name);
     const key = houseName;
     const current = houseTotals.get(key) ?? {
       houseName,
-      color: getHouseColor(profile?.house?.name, profile?.house?.hex_code),
+      color: getHouseColor(house?.name, house?.hex_code),
       points: 0,
     };
-    current.points += Number(row.points_earned ?? 0);
+    current.points += Number(row.cp_earned ?? row.points_earned ?? 0);
     houseTotals.set(key, current);
   }
 
@@ -172,7 +186,10 @@ export default async function GamePage({ params }: GamePageProps) {
   }
 
   const difficulty = getDifficulty(game.pts_per_minute);
-  const pointsReward = isSpeedTap ? "100 / 250 / 500 PTS" : `${(game.pts_per_minute ?? 10) * 15} PTS`;
+  const multiplierLabel = Number(game.difficulty_multiplier ?? 1).toFixed(2);
+  const pointsReward = isSpeedTap
+    ? `CT 100 / 250 / 500 | CP x${multiplierLabel}`
+    : `CT ${(game.pts_per_minute ?? 10) * 15} | CP x${multiplierLabel}`;
   const gameType = (game.type ?? "timed").toUpperCase();
   const category = game.source?.toUpperCase() === "GAMEDISTRIBUTION" ? "ARCADE" : (game.source ?? "WEB").toUpperCase();
   const howToPlay = isSpeedTap
@@ -180,14 +197,14 @@ export default async function GamePage({ params }: GamePageProps) {
         "WAIT FOR GAME START THEN PICK EASY / MEDIUM / HARD",
         "CLICK ONLY YOUR HOUSE-COLOR TARGET BALL",
         "MEDIUM ADDS DECOYS + MOVEMENT, HARD FAILS ON WRONG TAP",
-        "FASTER REACTION + HIGHER DIFFICULTY = MORE POINTS",
+        "FASTER REACTION + HIGHER DIFFICULTY = MORE CT",
       ]
     : [
         "CLICK PLAY NOW TO START YOUR RUN",
         game.is_scored
           ? "SCORE AS HIGH AS POSSIBLE BEFORE EXITING"
           : `EARN ${game.pts_per_minute ?? 10} POINTS PER MINUTE SURVIVED`,
-        "SESSION POINTS ARE ADDED TO YOUR HOUSE TOTAL",
+        "YOUR CT GOES TO PLAYER RANK, CP GOES TO HOUSE RANK",
         "LEAVE THE GAME PAGE TO LOCK IN YOUR SESSION SCORE",
       ];
 
@@ -227,8 +244,8 @@ export default async function GamePage({ params }: GamePageProps) {
                   user={{
                     username: sdkPlayerName,
                     house: {
-                      name: userProfile?.house?.name ?? userHouseName,
-                      hex_code: userProfile?.house?.hex_code ?? userHouseColor,
+                      name: currentHouse?.name ?? userHouseName,
+                      hex_code: currentHouse?.hex_code ?? userHouseColor,
                     },
                   }}
                   showExitButton={false}
@@ -276,7 +293,7 @@ export default async function GamePage({ params }: GamePageProps) {
             </div>
 
             <div className="space-y-2 border-b-[3px] border-[#111111] px-5 py-5">
-              <p className={`${plexMono.className} text-[10px] font-semibold tracking-[0.18em] text-[#777777]`}>POINTS REWARD</p>
+              <p className={`${plexMono.className} text-[10px] font-semibold tracking-[0.18em] text-[#777777]`}>REWARD MODEL</p>
               <p className={`${spaceGrotesk.className} text-[42px] leading-none font-bold tracking-[-0.03em] text-[#FFD700]`}>
                 {pointsReward}
               </p>

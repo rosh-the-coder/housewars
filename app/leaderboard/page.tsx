@@ -7,13 +7,13 @@ type HouseRow = {
   id: string;
   name: string;
   hex_code: string | null;
-  total_points: number | null;
+  cp_total: number | null;
 };
 
 type PlayerRow = {
   id: string;
   username: string | null;
-  total_points: number | null;
+  ct_total: number | null;
   house:
     | {
         name: string;
@@ -31,19 +31,19 @@ export default async function LeaderboardPage() {
   const [{ data: houses }, { data: players }] = await Promise.all([
     supabase
       .from("houses")
-      .select("id,name,hex_code,total_points")
-      .order("total_points", { ascending: false })
+      .select("id,name,hex_code,cp_total")
+      .order("cp_total", { ascending: false })
       .limit(4),
     supabase
       .from("profiles")
-      .select("id,username,total_points,house:houses(name,hex_code)")
-      .order("total_points", { ascending: false })
+      .select("id,username,ct_total,house:houses(name,hex_code)")
+      .order("ct_total", { ascending: false })
       .limit(10),
   ]);
 
   const houseRows = (houses ?? []) as HouseRow[];
   const playerRows = (players ?? []) as PlayerRow[];
-  const maxHousePoints = Math.max(...houseRows.map((house) => Number(house.total_points ?? 0)), 1);
+  const maxHousePoints = Math.max(...houseRows.map((house) => Number(house.cp_total ?? 0)), 1);
   const medalLeftBorder = ["#FFD700", "#C0C0C0", "#CD7F32"];
 
   return (
@@ -81,7 +81,7 @@ export default async function LeaderboardPage() {
               <div
                 className="absolute inset-y-0 left-0"
                 style={{
-                  width: `${Math.max(35, Math.round((Number(house.total_points ?? 0) / maxHousePoints) * 100))}%`,
+                  width: `${Math.max(35, Math.round((Number(house.cp_total ?? 0) / maxHousePoints) * 100))}%`,
                   background:
                     house.hex_code === "#DC2626"
                       ? "rgba(220, 38, 38, 0.2)"
@@ -102,9 +102,9 @@ export default async function LeaderboardPage() {
                 </p>
                 <div className="h-px flex-1" />
                 <p className={`${oswald.className} text-5xl leading-none`}>
-                  {Number(house.total_points ?? 0).toLocaleString()}
+                  {Number(house.cp_total ?? 0).toLocaleString()}
                 </p>
-                <p className={`${jetMono.className} text-[11px] font-semibold text-[#777777]`}>PTS</p>
+                <p className={`${jetMono.className} text-[11px] font-semibold text-[#777777]`}>CP</p>
               </div>
             </article>
           ))}
@@ -119,7 +119,7 @@ export default async function LeaderboardPage() {
                   <th className="px-5 py-3 text-left">RANK</th>
                   <th className="px-5 py-3 text-left">PLAYER</th>
                   <th className="px-5 py-3 text-left">HOUSE</th>
-                  <th className="px-5 py-3 text-right">POINTS</th>
+                  <th className="px-5 py-3 text-right">CT</th>
                 </tr>
               </thead>
               <tbody className={jetMono.className}>
@@ -149,7 +149,7 @@ export default async function LeaderboardPage() {
                       </span>
                     </td>
                     <td className="w-[120px] px-5 py-3 text-right font-semibold">
-                      {Number(row.total_points ?? 0).toLocaleString()}
+                      {Number(row.ct_total ?? 0).toLocaleString()}
                     </td>
                   </tr>
                   );
