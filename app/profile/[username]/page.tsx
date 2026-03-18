@@ -1,8 +1,12 @@
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { ProfileView } from "@/components/profile-view";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+type PublicProfilePageProps = {
+  params: Promise<{ username: string }>;
+};
 
 type ProfileRow = {
   id: string;
@@ -25,26 +29,20 @@ type ProfileRow = {
     | null;
 };
 
-export default async function ProfilePage() {
+export default async function PublicProfilePage({ params }: PublicProfilePageProps) {
+  const { username } = await params;
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login?error=Please log in first");
-  }
 
   const { data: profile } = await supabase
     .from("profiles")
     .select(
       "id,username,gp_alltime,gp_weekly,challenge_tokens,total_games_played,top10_finishes,weekly_wins,house:houses(name,hex_code)",
     )
-    .eq("id", user.id)
+    .eq("username", username)
     .maybeSingle<ProfileRow>();
 
   if (!profile) {
-    redirect("/signup?error=Complete signup to create your profile");
+    notFound();
   }
 
   const [winsCountResult, recentResultsResult, challengeHistoryResult, badgeRowsResult] =
@@ -73,7 +71,6 @@ export default async function ProfilePage() {
     ]);
 
   const house = Array.isArray(profile.house) ? profile.house[0] : profile.house;
-  const username = profile.username ?? user.email?.split("@")[0] ?? "player";
 
   const recentResults = (recentResultsResult.data ?? []).map((row) => {
     const parsed = row as {
@@ -127,20 +124,22 @@ export default async function ProfilePage() {
     };
   });
 
-  const badges = (badgeRowsResult.data ?? []).map((row) => {
-    const parsed = row as {
-      badge?: { name?: string | null } | { name?: string | null }[] | null;
-    };
-    const badge = Array.isArray(parsed.badge) ? parsed.badge[0] : parsed.badge;
-    return String(badge?.name ?? "").trim();
-  }).filter(Boolean);
+  const badges = (badgeRowsResult.data ?? [])
+    .map((row) => {
+      const parsed = row as {
+        badge?: { name?: string | null } | { name?: string | null }[] | null;
+      };
+      const badge = Array.isArray(parsed.badge) ? parsed.badge[0] : parsed.badge;
+      return String(badge?.name ?? "").trim();
+    })
+    .filter(Boolean);
 
   return (
     <ProfileView
-      username={username}
+      username={profile.username ?? username}
       houseName={house?.name ?? "House"}
       houseHex={house?.hex_code ?? "#DC2626"}
-      editable
+      editable={false}
       primaryStats={[
         { label: "ALL-TIME GP", value: Number(profile.gp_alltime ?? 0).toLocaleString(), color: "#FFD700" },
         { label: "WEEKLY GP", value: Number(profile.gp_weekly ?? 0).toLocaleString(), color: "#FFD700" },

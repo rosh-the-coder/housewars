@@ -3,7 +3,7 @@ export type HouseName = "Red" | "Blue" | "Green" | "Yellow";
 export type House = {
   name: HouseName;
   color: string;
-  points: number;
+  gp_alltime: number;
   members: number;
 };
 
@@ -12,7 +12,7 @@ export type User = {
   name: string;
   house: HouseName;
   level: number;
-  totalPoints: number;
+  gp_alltime: number;
 };
 
 export type Game = {
@@ -30,7 +30,7 @@ export type Game = {
 export type Challenge = {
   id: string;
   title: string;
-  rewardPoints: number;
+  gp_reward: number;
   status: "Open" | "In Progress" | "Completed";
 };
 
@@ -42,17 +42,17 @@ export const houseColors: Record<HouseName, string> = {
 };
 
 export const houses: House[] = [
-  { name: "Red", color: houseColors.Red, points: 19320, members: 128 },
-  { name: "Blue", color: houseColors.Blue, points: 18740, members: 132 },
-  { name: "Green", color: houseColors.Green, points: 17610, members: 121 },
-  { name: "Yellow", color: houseColors.Yellow, points: 16890, members: 117 },
+  { name: "Red", color: houseColors.Red, gp_alltime: 19320, members: 128 },
+  { name: "Blue", color: houseColors.Blue, gp_alltime: 18740, members: 132 },
+  { name: "Green", color: houseColors.Green, gp_alltime: 17610, members: 121 },
+  { name: "Yellow", color: houseColors.Yellow, gp_alltime: 16890, members: 117 },
 ];
 
 export const users: User[] = [
-  { id: "u1", name: "Aria Stone", house: "Red", level: 14, totalPoints: 2890 },
-  { id: "u2", name: "Kai Mercer", house: "Blue", level: 13, totalPoints: 2710 },
-  { id: "u3", name: "Nina Vale", house: "Green", level: 12, totalPoints: 2525 },
-  { id: "u4", name: "Leo Park", house: "Yellow", level: 10, totalPoints: 2180 },
+  { id: "u1", name: "Aria Stone", house: "Red", level: 14, gp_alltime: 2890 },
+  { id: "u2", name: "Kai Mercer", house: "Blue", level: 13, gp_alltime: 2710 },
+  { id: "u3", name: "Nina Vale", house: "Green", level: 12, gp_alltime: 2525 },
+  { id: "u4", name: "Leo Park", house: "Yellow", level: 10, gp_alltime: 2180 },
 ];
 
 export const games: Game[] = [
@@ -158,19 +158,19 @@ export const challenges: Challenge[] = [
   {
     id: "c1",
     title: "Play 3 games in one session",
-    rewardPoints: 300,
+    gp_reward: 300,
     status: "Open",
   },
   {
     id: "c2",
     title: "Score 2,000+ in Asteroid Rush",
-    rewardPoints: 500,
+    gp_reward: 500,
     status: "In Progress",
   },
   {
     id: "c3",
     title: "Invite a friend to HouseWars",
-    rewardPoints: 200,
+    gp_reward: 200,
     status: "Completed",
   },
 ];

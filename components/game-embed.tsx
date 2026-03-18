@@ -28,10 +28,13 @@ type HouseWarsGameOverMessage = {
 };
 
 type SessionEndPayload = {
-  points_earned?: number;
-  ct_earned?: number;
-  cp_earned?: number;
   rank?: number | string | null;
+  total_players?: number | null;
+  gp_earned?: number;
+  ct_earned?: number;
+  weekly_gp_total?: number;
+  ct_balance?: number;
+  multiplier?: number;
   house_color?: string;
 };
 
@@ -49,11 +52,29 @@ export function GameEmbed({
   const isStartingRef = useRef(false);
   const isEndingRef = useRef(false);
   const [iframeKey, setIframeKey] = useState(0);
-  const [result, setResult] = useState<{ ct: number; cp: number; rank: string | number }>({
-    ct: 0,
-    cp: 0,
+  const [result, setResult] = useState<{
+    rank: number | string;
+    totalPlayers: number;
+    placementPoints: number;
+    difficultyMultiplier: number;
+    gpEarned: number;
+    ctEarned: number;
+    weeklyGpTotal: number;
+    ctBalance: number;
+    accentColor: string;
+  }>({
     rank: "-",
+    totalPlayers: 0,
+    placementPoints: 0,
+    difficultyMultiplier: 1,
+    gpEarned: 0,
+    ctEarned: 0,
+    weeklyGpTotal: 0,
+    ctBalance: 0,
+    accentColor: "#DC2626",
   });
+  const [dismissCountdown, setDismissCountdown] = useState(10);
+  const [modalOpenedAtMs, setModalOpenedAtMs] = useState<number | null>(null);
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
 
   const startSession = useCallback(async (): Promise<string | null> => {
@@ -115,10 +136,18 @@ export function GameEmbed({
       }
 
       const payload = (await response.json()) as SessionEndPayload;
+      setDismissCountdown(10);
+      setModalOpenedAtMs(Date.now());
       setResult({
-        ct: Number(payload.ct_earned ?? payload.points_earned ?? 0),
-        cp: Number(payload.cp_earned ?? payload.points_earned ?? 0),
         rank: payload.rank ?? "-",
+        totalPlayers: Number(payload.total_players ?? 0),
+        placementPoints: Math.max(0, Math.round(metricValue)),
+        difficultyMultiplier: Number(payload.multiplier ?? 1),
+        gpEarned: Number(payload.gp_earned ?? 0),
+        ctEarned: Number(payload.ct_earned ?? 0),
+        weeklyGpTotal: Number(payload.weekly_gp_total ?? 0),
+        ctBalance: Number(payload.ct_balance ?? 0),
+        accentColor: payload.house_color ?? "#DC2626",
       });
       setIsResultModalOpen(true);
       router.refresh();
@@ -171,6 +200,25 @@ export function GameEmbed({
     };
   }, [endSession]);
 
+  useEffect(() => {
+    if (!isResultModalOpen || modalOpenedAtMs === null) return;
+
+    const timer = window.setInterval(() => {
+      const elapsedSeconds = Math.floor((Date.now() - modalOpenedAtMs) / 1000);
+      const remaining = Math.max(0, 10 - elapsedSeconds);
+      setDismissCountdown(remaining);
+      if (remaining === 0) {
+        setIsResultModalOpen(false);
+        router.push("/games");
+        router.refresh();
+      }
+    }, 250);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [isResultModalOpen, modalOpenedAtMs, router]);
+
   if (!embedUrl) {
     return (
       <div className="grid h-[520px] place-items-center rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 px-6 text-center">
@@ -204,46 +252,78 @@ export function GameEmbed({
       />
       {isResultModalOpen ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
-          <div className="w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-950 p-6 text-white shadow-2xl">
-            <h3 className="text-xl font-bold">Run Complete</h3>
-            <p className="mt-2 text-zinc-300">Session submitted successfully.</p>
-            <div className="mt-6 grid grid-cols-3 gap-4">
-              <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-4">
-                <p className="text-xs uppercase tracking-wide text-zinc-400">Rank</p>
-                <p className="mt-1 text-2xl font-bold">{result.rank}</p>
+          <div
+            className="w-full max-w-xl border-[3px] border-[#0D0D0D] bg-[#1A1A1A] text-white shadow-2xl"
+            style={{ borderTopColor: result.accentColor, borderTopWidth: "8px" }}
+          >
+            <div className="border-b-[3px] border-[#0D0D0D] px-5 py-4">
+              <h3 className="text-3xl font-black uppercase tracking-[0.06em]">{title.toUpperCase()}</h3>
+            </div>
+
+            <div className="border-b-[3px] border-[#0D0D0D] px-5 py-3">
+              <p className="text-sm font-semibold tracking-[0.08em] text-[#F5F5F0]">
+                RANK #{result.rank} OF {result.totalPlayers} PLAYERS
+              </p>
+            </div>
+
+            <div className="space-y-2 border-b-[3px] border-[#0D0D0D] px-5 py-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold tracking-[0.08em] text-[#777777]">PLACEMENT:</p>
+                <p className="text-sm font-bold">{result.placementPoints} pts</p>
               </div>
-              <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-4">
-                <p className="text-xs uppercase tracking-wide text-zinc-400">CT Earned</p>
-                <p className="mt-1 text-2xl font-bold">{result.ct}</p>
-              </div>
-              <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-4">
-                <p className="text-xs uppercase tracking-wide text-zinc-400">CP Contributed</p>
-                <p className="mt-1 text-2xl font-bold">{result.cp}</p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold tracking-[0.08em] text-[#777777]">DIFFICULTY:</p>
+                <p className="text-sm font-bold">× {result.difficultyMultiplier.toFixed(1)}</p>
               </div>
             </div>
-            <div className="mt-6 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsResultModalOpen(false);
-                  sessionIdRef.current = null;
-                  setIframeKey((value) => value + 1);
-                }}
-                className="rounded-md border border-zinc-500 px-4 py-2 text-sm font-semibold text-white"
-              >
-                Play Again
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsResultModalOpen(false);
-                  router.push("/games");
-                  router.refresh();
-                }}
-                className="rounded-md bg-white px-4 py-2 text-sm font-semibold text-black"
-              >
-                Back to Games
-              </button>
+
+            <div className="space-y-2 border-b-[3px] border-[#0D0D0D] px-5 py-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold tracking-[0.08em] text-[#777777]">GLORY POINTS:</p>
+                <p className="text-sm font-bold text-[#FFD700]">+{result.gpEarned.toFixed(1)} GP</p>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold tracking-[0.08em] text-[#777777]">TOKENS:</p>
+                <p className="text-sm font-bold text-[#00D4AA]">+{result.ctEarned} CT</p>
+              </div>
+            </div>
+
+            <div className="space-y-1 border-b-[3px] border-[#0D0D0D] px-5 py-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold tracking-[0.08em] text-[#777777]">WEEKLY GP TOTAL:</p>
+                <p className="text-sm font-bold text-[#F5F5F0]">{result.weeklyGpTotal.toFixed(1)} GP</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 px-5 py-4">
+              <p className="text-[10px] font-semibold tracking-[0.08em] text-[#777777]">
+                AUTO LOBBY IN {dismissCountdown}s
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsResultModalOpen(false);
+                    sessionIdRef.current = null;
+                    setIframeKey((value) => value + 1);
+                    setDismissCountdown(10);
+                  }}
+                  className="border-[3px] border-[#F5F5F0] px-4 py-2 text-sm font-semibold text-[#F5F5F0]"
+                >
+                  PLAY AGAIN
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsResultModalOpen(false);
+                    router.push("/games");
+                    router.refresh();
+                  }}
+                  className="bg-[#F5F5F0] px-4 py-2 text-sm font-semibold text-[#111111]"
+                >
+                  LOBBY
+                </button>
+              </div>
             </div>
           </div>
         </div>

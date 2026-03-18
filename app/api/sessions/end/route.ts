@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-import { resolveBasePoints, resolveCpFromBase } from "@/lib/points";
+import { resolveBasePoints } from "@/lib/points";
 import { slugify } from "@/lib/slug";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -11,14 +11,15 @@ type SessionRow = {
   started_at: string;
   ended_at: string | null;
   raw_score: number | null;
-  points_earned: number | null;
+  gp_earned: number | null;
+  ct_earned: number | null;
 };
 
 type GameRow = {
   id: string;
   name: string;
   is_scored: boolean;
-  pts_per_minute: number | null;
+  ct_reward: number | null;
   difficulty_multiplier: number | null;
 };
 
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
 
     const { data: session, error: sessionError } = await supabase
       .from("game_sessions")
-      .select("id,user_id,game_id,started_at,ended_at,raw_score,points_earned")
+      .select("id,user_id,game_id,started_at,ended_at,raw_score,gp_earned,ct_earned")
       .eq("id", sessionId)
       .single<SessionRow>();
 
@@ -86,9 +87,8 @@ export async function POST(request: Request) {
 
     if (session.ended_at) {
       return NextResponse.json({
-        points_earned: session.points_earned ?? 0,
-        ct_earned: session.points_earned ?? 0,
-        cp_earned: session.points_earned ?? 0,
+        gp_earned: session.gp_earned ?? 0,
+        ct_earned: session.ct_earned ?? 0,
         house_color: "#DC2626",
         already_ended: true,
       });
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
 
     const { data: game, error: gameError } = await supabase
       .from("games")
-      .select("id,name,is_scored,pts_per_minute,difficulty_multiplier")
+      .select("id,name,is_scored,ct_reward,difficulty_multiplier")
       .eq("id", session.game_id)
       .single<GameRow>();
 
@@ -119,12 +119,11 @@ export async function POST(request: Request) {
       fallbackRawScore: Number(session.raw_score ?? 0),
       isScored: game.is_scored,
       durationSeconds,
-      ptsPerMinute: Number(game.pts_per_minute ?? 0),
+      ptsPerMinute: Number(game.ct_reward ?? 0),
     });
-    const ctEarned = basePoints;
     const multiplier = Number(game.difficulty_multiplier ?? 1);
-    const cpEarned = resolveCpFromBase(basePoints, multiplier);
-    const pointsEarned = ctEarned;
+    const gpEarned = Math.max(0, Math.round(basePoints * multiplier));
+    const ctEarned = Math.max(0, Math.round(game.ct_reward ?? 0));
 
     const { error: updateError } = await supabase
       .from("game_sessions")
@@ -132,11 +131,8 @@ export async function POST(request: Request) {
         ended_at: new Date().toISOString(),
         duration_seconds: durationSeconds,
         raw_score: rawScore,
-        points_earned: pointsEarned,
-        base_points: basePoints,
+        gp_earned: gpEarned,
         ct_earned: ctEarned,
-        cp_earned: cpEarned,
-        difficulty_multiplier_snapshot: multiplier,
       })
       .eq("id", session.id);
 
@@ -153,23 +149,57 @@ export async function POST(request: Request) {
       );
     }
 
-    const { error: awardError } = await supabase.rpc("award_dual_points", {
-      p_user_id: user.id,
-      p_house_id: houseId,
-      p_base_points: basePoints,
-      p_multiplier: multiplier,
-      p_ct_points: ctEarned,
-      p_cp_points: cpEarned,
-    });
+    const { data: profileTotals, error: profileTotalsError } = await supabase
+      .from("profiles")
+      .select("gp_weekly,gp_alltime,challenge_tokens")
+      .eq("id", user.id)
+      .single();
+    if (profileTotalsError || !profileTotals) {
+      return NextResponse.json(
+        { error: profileTotalsError?.message ?? "Could not load profile totals" },
+        { status: 500 },
+      );
+    }
 
-    if (awardError) {
-      return NextResponse.json({ error: awardError.message }, { status: 500 });
+    const { error: profileAwardError } = await supabase
+      .from("profiles")
+      .update({
+        gp_weekly: Number(profileTotals.gp_weekly ?? 0) + gpEarned,
+        gp_alltime: Number(profileTotals.gp_alltime ?? 0) + gpEarned,
+        challenge_tokens: Number(profileTotals.challenge_tokens ?? 0) + ctEarned,
+      })
+      .eq("id", user.id);
+    if (profileAwardError) {
+      return NextResponse.json({ error: profileAwardError.message }, { status: 500 });
+    }
+
+    const { data: houseTotals, error: houseTotalsError } = await supabase
+      .from("houses")
+      .select("gp_weekly,gp_alltime")
+      .eq("id", houseId)
+      .single();
+    if (houseTotalsError || !houseTotals) {
+      return NextResponse.json(
+        { error: houseTotalsError?.message ?? "Could not load house totals" },
+        { status: 500 },
+      );
+    }
+
+    const { error: houseAwardError } = await supabase
+      .from("houses")
+      .update({
+        gp_weekly: Number(houseTotals.gp_weekly ?? 0) + gpEarned,
+        gp_alltime: Number(houseTotals.gp_alltime ?? 0) + gpEarned,
+      })
+      .eq("id", houseId);
+    if (houseAwardError) {
+      return NextResponse.json({ error: houseAwardError.message }, { status: 500 });
     }
 
     const rankAttempt = await supabase
       .from("profiles")
-      .select("id,ct_total,total_points")
-      .order("ct_total", { ascending: false });
+      .select("id,gp_alltime")
+      .order("gp_alltime", { ascending: false });
     const rank =
       (rankAttempt.data ?? []).findIndex(
         (row) => (row as { id?: string }).id === user.id,
@@ -181,9 +211,8 @@ export async function POST(request: Request) {
     revalidatePath("/leaderboard");
 
     return NextResponse.json({
-      points_earned: pointsEarned,
+      gp_earned: gpEarned,
       ct_earned: ctEarned,
-      cp_earned: cpEarned,
       multiplier,
       rank: rank > 0 ? rank : null,
       house_color: houseColor,

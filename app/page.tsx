@@ -2,18 +2,18 @@ import Link from "next/link";
 import { jetMono, oswald } from "@/lib/fonts";
 
 const houseCards = [
-  { name: "PHOENIX", color: "#DC2626", points: "12,450 PTS", members: "342 MEMBERS" },
-  { name: "TSUNAMI", color: "#2563EB", points: "11,890 PTS", members: "318 MEMBERS" },
-  { name: "VIPER", color: "#16A34A", points: "10,720 PTS", members: "295 MEMBERS" },
-  { name: "THUNDER", color: "#CA8A04", points: "9,980 PTS", members: "287 MEMBERS" },
+  { name: "PHOENIX", color: "#DC2626", gp_alltime: "12,450 GP", members: "342 MEMBERS" },
+  { name: "TSUNAMI", color: "#2563EB", gp_alltime: "11,890 GP", members: "318 MEMBERS" },
+  { name: "VIPER", color: "#16A34A", gp_alltime: "10,720 GP", members: "295 MEMBERS" },
+  { name: "THUNDER", color: "#CA8A04", gp_alltime: "9,980 GP", members: "287 MEMBERS" },
 ];
 
 const topPlayers = [
-  { rank: "#1", username: "xDarkSlayer", house: "PHOENIX", points: "4,892", color: "#DC2626" },
-  { rank: "#2", username: "TidalCrusher", house: "TSUNAMI", points: "4,651", color: "#2563EB" },
-  { rank: "#3", username: "VenomStrike99", house: "VIPER", points: "4,210", color: "#16A34A" },
-  { rank: "#4", username: "BoltMaster", house: "THUNDER", points: "3,987", color: "#CA8A04" },
-  { rank: "#5", username: "FlameRider", house: "PHOENIX", points: "3,745", color: "#DC2626" },
+  { rank: "#1", username: "xDarkSlayer", house: "PHOENIX", gp_alltime: "4,892", color: "#DC2626" },
+  { rank: "#2", username: "TidalCrusher", house: "TSUNAMI", gp_alltime: "4,651", color: "#2563EB" },
+  { rank: "#3", username: "VenomStrike99", house: "VIPER", gp_alltime: "4,210", color: "#16A34A" },
+  { rank: "#4", username: "BoltMaster", house: "THUNDER", gp_alltime: "3,987", color: "#CA8A04" },
+  { rank: "#5", username: "FlameRider", house: "PHOENIX", gp_alltime: "3,745", color: "#DC2626" },
 ];
 
 export default function Home() {
@@ -24,7 +24,7 @@ export default function Home() {
           className={`${oswald.className} text-center text-4xl leading-[1.05] tracking-[0.06em] sm:text-6xl lg:text-8xl`}
         >
           <span className="block">PICK YOUR HOUSE.</span>
-          <span className="block">EARN POINTS.</span>
+          <span className="block">EARN GP.</span>
           <span className="block text-[#DC2626]">DESTROY THE REST.</span>
         </h1>
       </div>
@@ -42,7 +42,7 @@ export default function Home() {
             >
               {house.name}
             </h2>
-            <p className={`${oswald.className} text-4xl leading-none`}>{house.points}</p>
+            <p className={`${oswald.className} text-4xl leading-none`}>{house.gp_alltime}</p>
             <p className={`${jetMono.className} text-xs font-semibold tracking-[0.08em] text-[#777777]`}>
               {house.members}
             </p>
@@ -64,7 +64,7 @@ export default function Home() {
                     USERNAME
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-extrabold tracking-[0.08em]">HOUSE</th>
-                  <th className="px-4 py-3 text-right text-xs font-extrabold tracking-[0.08em]">POINTS</th>
+                  <th className="px-4 py-3 text-right text-xs font-extrabold tracking-[0.08em]">GP</th>
                 </tr>
               </thead>
               <tbody>
@@ -78,7 +78,7 @@ export default function Home() {
                       {player.house}
                     </td>
                     <td className={`${jetMono.className} px-4 py-4 text-right text-sm font-bold`}>
-                      {player.points}
+                      {player.gp_alltime}
                     </td>
                   </tr>
                 ))}

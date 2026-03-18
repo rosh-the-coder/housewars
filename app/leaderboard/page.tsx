@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { jetMono, oswald } from "@/lib/fonts";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -7,13 +8,16 @@ type HouseRow = {
   id: string;
   name: string;
   hex_code: string | null;
-  cp_total: number | null;
+  gp_weekly: number | null;
+  gp_alltime: number | null;
 };
 
 type PlayerRow = {
   id: string;
   username: string | null;
-  ct_total: number | null;
+  gp_weekly: number | null;
+  gp_alltime: number | null;
+  challenge_tokens: number | null;
   house:
     | {
         name: string;
@@ -26,24 +30,31 @@ type PlayerRow = {
     | null;
 };
 
-export default async function LeaderboardPage() {
+type LeaderboardPageProps = {
+  searchParams: Promise<{ metric?: string }>;
+};
+
+export default async function LeaderboardPage({ searchParams }: LeaderboardPageProps) {
+  const { metric } = await searchParams;
+  const selectedMetric = metric === "alltime" ? "alltime" : "weekly";
+  const orderColumn = selectedMetric === "alltime" ? "gp_alltime" : "gp_weekly";
   const supabase = await createSupabaseServerClient();
   const [{ data: houses }, { data: players }] = await Promise.all([
     supabase
       .from("houses")
-      .select("id,name,hex_code,cp_total")
-      .order("cp_total", { ascending: false })
+      .select("id,name,hex_code,gp_weekly,gp_alltime")
+      .order("gp_weekly", { ascending: false })
       .limit(4),
     supabase
       .from("profiles")
-      .select("id,username,ct_total,house:houses(name,hex_code)")
-      .order("ct_total", { ascending: false })
+      .select("id,username,gp_weekly,gp_alltime,challenge_tokens,house:houses(name,hex_code)")
+      .order(orderColumn, { ascending: false })
       .limit(10),
   ]);
 
   const houseRows = (houses ?? []) as HouseRow[];
   const playerRows = (players ?? []) as PlayerRow[];
-  const maxHousePoints = Math.max(...houseRows.map((house) => Number(house.cp_total ?? 0)), 1);
+  const maxHouseGp = Math.max(...houseRows.map((house) => Number(house.gp_weekly ?? 0)), 1);
   const medalLeftBorder = ["#FFD700", "#C0C0C0", "#CD7F32"];
 
   return (
@@ -81,7 +92,7 @@ export default async function LeaderboardPage() {
               <div
                 className="absolute inset-y-0 left-0"
                 style={{
-                  width: `${Math.max(35, Math.round((Number(house.cp_total ?? 0) / maxHousePoints) * 100))}%`,
+                  width: `${Math.max(35, Math.round((Number(house.gp_weekly ?? 0) / maxHouseGp) * 100))}%`,
                   background:
                     house.hex_code === "#DC2626"
                       ? "rgba(220, 38, 38, 0.2)"
@@ -101,10 +112,14 @@ export default async function LeaderboardPage() {
                   {house.name.toUpperCase()}
                 </p>
                 <div className="h-px flex-1" />
-                <p className={`${oswald.className} text-5xl leading-none`}>
-                  {Number(house.cp_total ?? 0).toLocaleString()}
-                </p>
-                <p className={`${jetMono.className} text-[11px] font-semibold text-[#777777]`}>CP</p>
+                <div className="flex items-center gap-4">
+                  <p className={`${jetMono.className} text-[11px] font-semibold text-[#FFD700]`}>
+                    {Number(house.gp_weekly ?? 0).toLocaleString()} GP THIS WEEK
+                  </p>
+                  <p className={`${jetMono.className} text-[11px] font-semibold text-[#777777]`}>
+                    {Number(house.gp_alltime ?? 0).toLocaleString()} GP ALL TIME
+                  </p>
+                </div>
               </div>
             </article>
           ))}
@@ -112,6 +127,24 @@ export default async function LeaderboardPage() {
 
         <div className="space-y-2">
           <p className={`${jetMono.className} text-xs text-[#777777]`}>{"// player_rankings"}</p>
+          <div className="flex gap-0">
+            <Link
+              href="/leaderboard?metric=weekly"
+              className={`${jetMono.className} border-[3px] border-[#0D0D0D] px-5 py-2 text-xs font-semibold ${
+                selectedMetric === "weekly" ? "bg-[#0D0D0D] text-white" : "bg-transparent text-[#0D0D0D]"
+              }`}
+            >
+              WEEKLY GP
+            </Link>
+            <Link
+              href="/leaderboard?metric=alltime"
+              className={`${jetMono.className} border-y-[3px] border-r-[3px] border-[#0D0D0D] px-5 py-2 text-xs font-semibold ${
+                selectedMetric === "alltime" ? "bg-[#0D0D0D] text-white" : "bg-transparent text-[#0D0D0D]"
+              }`}
+            >
+              ALL-TIME GP
+            </Link>
+          </div>
           <div className="overflow-x-auto border-[3px] border-[#0D0D0D]">
             <table className="w-full min-w-[900px] border-collapse">
               <thead className={`${jetMono.className} bg-[#0D0D0D] text-xs font-semibold text-white`}>
@@ -120,6 +153,7 @@ export default async function LeaderboardPage() {
                   <th className="px-5 py-3 text-left">PLAYER</th>
                   <th className="px-5 py-3 text-left">HOUSE</th>
                   <th className="px-5 py-3 text-right">CT</th>
+                  <th className="px-5 py-3 text-right">GP</th>
                 </tr>
               </thead>
               <tbody className={jetMono.className}>
@@ -149,7 +183,12 @@ export default async function LeaderboardPage() {
                       </span>
                     </td>
                     <td className="w-[120px] px-5 py-3 text-right font-semibold">
-                      {Number(row.ct_total ?? 0).toLocaleString()}
+                      <span className="inline-flex items-center gap-1 rounded bg-[#0D0D0D] px-2 py-1 text-[11px] text-[#00D4AA]">
+                        ◈ {Number(row.challenge_tokens ?? 0)}
+                      </span>
+                    </td>
+                    <td className="w-[120px] px-5 py-3 text-right font-semibold">
+                      {Number(selectedMetric === "alltime" ? row.gp_alltime ?? 0 : row.gp_weekly ?? 0).toLocaleString()}
                     </td>
                   </tr>
                   );

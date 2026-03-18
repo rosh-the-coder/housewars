@@ -18,11 +18,11 @@ type GamePageProps = {
 type DbGame = {
   id: string;
   name: string;
-  source: string | null;
   type: string | null;
+  difficulty: string | null;
   embed_url: string;
   thumbnail_url: string | null;
-  pts_per_minute: number | null;
+  ct_reward: number | null;
   difficulty_multiplier: number | null;
   is_scored: boolean;
   is_active: boolean;
@@ -31,9 +31,8 @@ type DbGame = {
 type SessionRow = {
   user_id: string;
   raw_score: number | null;
-  points_earned: number | null;
+  gp_earned: number | null;
   ct_earned: number | null;
-  cp_earned: number | null;
 };
 
 type ProfileRow = {
@@ -70,11 +69,11 @@ function getHouseColor(name: string | null | undefined, fallback?: string | null
   return fallback ?? "#777777";
 }
 
-function getDifficulty(ptsPerMinute: number | null) {
-  const ppm = ptsPerMinute ?? 10;
-  if (ppm <= 9) return { label: "EASY", color: "#16A34A" };
-  if (ppm <= 11) return { label: "MEDIUM", color: "#FFD700" };
-  return { label: "HARD", color: "#DC2626" };
+function getDifficulty(difficulty: string | null) {
+  const value = (difficulty ?? "").toLowerCase();
+  if (value === "easy") return { label: "EASY", color: "#16A34A" };
+  if (value === "hard") return { label: "HARD", color: "#DC2626" };
+  return { label: "MEDIUM", color: "#FFD700" };
 }
 
 function toLocaleScore(value: number): string {
@@ -96,7 +95,7 @@ export default async function GamePage({ params }: GamePageProps) {
 
   const { data } = await supabase
     .from("games")
-    .select("id,name,source,type,embed_url,thumbnail_url,pts_per_minute,difficulty_multiplier,is_scored,is_active")
+    .select("id,name,type,difficulty,embed_url,thumbnail_url,ct_reward,difficulty_multiplier,is_scored,is_active")
     .eq("is_active", true);
   const games = (data ?? []) as DbGame[];
   const game = games.find((item) => slugify(item.name) === slug);
@@ -127,7 +126,7 @@ export default async function GamePage({ params }: GamePageProps) {
 
   const sessionsAttempt = await supabase
     .from("game_sessions")
-    .select("user_id,raw_score,points_earned,ct_earned,cp_earned")
+    .select("user_id,raw_score,gp_earned,ct_earned")
     .in("game_id", sessionGameIds)
     .not("ended_at", "is", null);
   const sessions = (sessionsAttempt.data ?? []) as SessionRow[];
@@ -138,7 +137,7 @@ export default async function GamePage({ params }: GamePageProps) {
       (max, row) =>
         Math.max(
           max,
-          Number(isSpeedTap ? row.ct_earned ?? row.points_earned ?? 0 : row.raw_score ?? 0),
+          Number(isSpeedTap ? row.ct_earned ?? row.gp_earned ?? 0 : row.raw_score ?? 0),
         ),
       0,
     );
@@ -156,7 +155,7 @@ export default async function GamePage({ params }: GamePageProps) {
     }
   }
 
-  const houseTotals = new Map<string, { houseName: string; color: string; points: number }>();
+  const houseTotals = new Map<string, { houseName: string; color: string; gp_alltime: number }>();
   for (const row of sessions) {
     const profile = profilesById.get(row.user_id);
     const house = Array.isArray(profile?.house) ? profile?.house[0] : profile?.house;
@@ -165,14 +164,14 @@ export default async function GamePage({ params }: GamePageProps) {
     const current = houseTotals.get(key) ?? {
       houseName,
       color: getHouseColor(house?.name, house?.hex_code),
-      points: 0,
+      gp_alltime: 0,
     };
-    current.points += Number(row.cp_earned ?? row.points_earned ?? 0);
+    current.gp_alltime += Number(row.gp_earned ?? 0);
     houseTotals.set(key, current);
   }
 
   const leaderboard = Array.from(houseTotals.values())
-    .sort((a, b) => b.points - a.points)
+    .sort((a, b) => b.gp_alltime - a.gp_alltime)
     .slice(0, 3);
 
   while (leaderboard.length < 3) {
@@ -181,17 +180,17 @@ export default async function GamePage({ params }: GamePageProps) {
     leaderboard.push({
       houseName,
       color: getHouseColor(houseName, null),
-      points: 0,
+      gp_alltime: 0,
     });
   }
 
-  const difficulty = getDifficulty(game.pts_per_minute);
+  const difficulty = getDifficulty(game.difficulty);
   const multiplierLabel = Number(game.difficulty_multiplier ?? 1).toFixed(2);
-  const pointsReward = isSpeedTap
-    ? `CT 100 / 250 / 500 | CP x${multiplierLabel}`
-    : `CT ${(game.pts_per_minute ?? 10) * 15} | CP x${multiplierLabel}`;
+  const gpRewardModel = isSpeedTap
+    ? `CT 100 / 250 / 500 | GP x${multiplierLabel}`
+    : `CT ${game.ct_reward ?? 0} | GP x${multiplierLabel}`;
   const gameType = (game.type ?? "timed").toUpperCase();
-  const category = game.source?.toUpperCase() === "GAMEDISTRIBUTION" ? "ARCADE" : (game.source ?? "WEB").toUpperCase();
+  const category = (game.type ?? "web").toUpperCase();
   const howToPlay = isSpeedTap
     ? [
         "WAIT FOR GAME START THEN PICK EASY / MEDIUM / HARD",
@@ -203,8 +202,8 @@ export default async function GamePage({ params }: GamePageProps) {
         "CLICK PLAY NOW TO START YOUR RUN",
         game.is_scored
           ? "SCORE AS HIGH AS POSSIBLE BEFORE EXITING"
-          : `EARN ${game.pts_per_minute ?? 10} POINTS PER MINUTE SURVIVED`,
-        "YOUR CT GOES TO PLAYER RANK, CP GOES TO HOUSE RANK",
+          : `EARN GP USING DIFFICULTY MULTIPLIER (CT BONUS ${game.ct_reward ?? 0})`,
+        "YOUR GP ADDS TO BOTH PLAYER AND HOUSE RANKINGS",
         "LEAVE THE GAME PAGE TO LOCK IN YOUR SESSION SCORE",
       ];
 
@@ -295,7 +294,7 @@ export default async function GamePage({ params }: GamePageProps) {
             <div className="space-y-2 border-b-[3px] border-[#111111] px-5 py-5">
               <p className={`${plexMono.className} text-[10px] font-semibold tracking-[0.18em] text-[#777777]`}>REWARD MODEL</p>
               <p className={`${spaceGrotesk.className} text-[42px] leading-none font-bold tracking-[-0.03em] text-[#FFD700]`}>
-                {pointsReward}
+                {gpRewardModel}
               </p>
               {isSpeedTap ? (
                 <p className={`${plexMono.className} text-[10px] font-semibold tracking-[0.08em] text-[#777777]`}>
@@ -306,7 +305,7 @@ export default async function GamePage({ params }: GamePageProps) {
 
             <div className="space-y-2 border-b-[3px] border-[#111111] px-5 py-5">
               <p className={`${plexMono.className} text-[10px] font-semibold tracking-[0.18em] text-[#777777]`}>
-                {isSpeedTap ? "YOUR BEST RUN POINTS" : "YOUR BEST SCORE"}
+                {isSpeedTap ? "YOUR BEST RUN GP" : "YOUR BEST SCORE"}
               </p>
               <p className={`${spaceGrotesk.className} text-[36px] leading-none font-bold text-[#111111]`}>
                 {toLocaleScore(userBestScore)}
@@ -335,7 +334,9 @@ export default async function GamePage({ params }: GamePageProps) {
                   <span className={`${plexMono.className} text-[11px] font-bold tracking-[0.08em] text-[#777777]`}>{`0${idx + 1}`}</span>
                   <span className={`${plexMono.className} text-xs font-bold tracking-[0.08em] text-[#111111]`}>{row.houseName}</span>
                 </div>
-                <span className={`${spaceGrotesk.className} text-sm font-bold text-[#111111]`}>{toLocaleScore(row.points)}</span>
+                <span className={`${spaceGrotesk.className} text-sm font-bold text-[#111111]`}>
+                  {toLocaleScore(row.gp_alltime)}
+                </span>
               </div>
             ))}
           </aside>

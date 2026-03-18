@@ -2,13 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { inter, jetMono } from "@/lib/fonts";
+import { useUser } from "@/hooks/use-user";
 
 type RootNavProps = {
   isLoggedIn: boolean;
+  userId?: string | null;
   username?: string | null;
   houseName?: string | null;
   houseHex?: string | null;
+  gpWeekly?: number;
+  gpAlltime?: number;
+  challengeTokens?: number;
 };
 
 function normalizeHouseName(name: string | null | undefined): string {
@@ -20,8 +26,41 @@ function normalizeHouseName(name: string | null | undefined): string {
   return (name ?? "HOUSE").toUpperCase();
 }
 
-export function RootNav({ isLoggedIn, username, houseName, houseHex }: RootNavProps) {
+function formatGp(value: number): string {
+  return Number(value ?? 0).toFixed(1);
+}
+
+const MIDDLE_LINKS = [
+  { href: "/dashboard", label: "DASHBOARD" },
+  { href: "/games", label: "GAMES" },
+  { href: "/challenges", label: "CHALLENGES" },
+  { href: "/leaderboard", label: "LEADERBOARD" },
+];
+
+export function RootNav({
+  isLoggedIn,
+  userId,
+  username,
+  houseName,
+  houseHex,
+  gpWeekly,
+  gpAlltime,
+  challengeTokens,
+}: RootNavProps) {
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const user = useUser({
+    isLoggedIn,
+    userId: userId ?? null,
+    initialUsername: username,
+    initialHouseName: houseName,
+    initialHouseHex: houseHex,
+    initialGpWeekly: gpWeekly,
+    initialGpAlltime: gpAlltime,
+    initialChallengeTokens: challengeTokens,
+  });
+
   if (pathname === "/welcome" || pathname === "/verify-email") {
     return null;
   }
@@ -39,10 +78,10 @@ export function RootNav({ isLoggedIn, username, houseName, houseHex }: RootNavPr
   const navLinkClass = (href: string) =>
     `${isActive(href) ? "underline underline-offset-4 decoration-2" : "hover:underline"} ${isDashboard ? "text-white" : "text-[#111111]"}`;
 
-  const showMiddleMenu = isLoggedIn && pathname !== "/";
-  const displayUsername = (username ?? "").trim() || "player";
-  const displayHouse = normalizeHouseName(houseName);
-  const displayHouseColor = houseHex ?? "#DC2626";
+  const showMiddleMenu = user.isLoggedIn && pathname !== "/";
+  const displayUsername = (user.username ?? "").trim() || "player";
+  const displayHouse = normalizeHouseName(user.houseName);
+  const displayHouseColor = user.houseHex ?? "#DC2626";
   const logoutClass = isDashboard
     ? `${jetMono.className} rounded-none bg-[#0D0D0D] px-6 py-2 text-[13px] font-bold text-[#F5F5F0] transition hover:opacity-90`
     : `${jetMono.className} rounded-none bg-[#111111] px-6 py-2.5 text-[13px] font-bold text-[#F5F5F0] transition hover:opacity-90`;
@@ -55,27 +94,46 @@ export function RootNav({ isLoggedIn, username, houseName, houseHex }: RootNavPr
         </Link>
         {showMiddleMenu ? (
           <div className={`${jetMono.className} hidden items-center gap-5 text-[11px] font-semibold tracking-[0.08em] md:flex`}>
-            <Link href="/dashboard" className={navLinkClass("/dashboard")}>
-              DASHBOARD
-            </Link>
-            <Link href="/games" className={navLinkClass("/games")}>
-              GAMES
-            </Link>
-            <Link href="/leaderboard" className={navLinkClass("/leaderboard")}>
-              LEADERBOARD
-            </Link>
-            <Link href="/challenges" className={navLinkClass("/challenges")}>
-              CHALLENGES
-            </Link>
+            {MIDDLE_LINKS.map((link) => (
+              <Link key={link.href} href={link.href} className={navLinkClass(link.href)}>
+                {link.label}
+              </Link>
+            ))}
           </div>
         ) : (
           <div />
         )}
         <div className="flex items-center gap-3">
-          {isLoggedIn ? (
+          {user.isLoggedIn ? (
             <>
-              <div className="hidden items-center gap-3 md:flex">
-                <p className={`${jetMono.className} text-[13px]`} style={{ color: navText }}>
+              {showMiddleMenu ? (
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen((value) => !value)}
+                  className={`${jetMono.className} rounded-none border-[3px] px-2.5 py-1 text-[12px] font-bold md:hidden`}
+                  style={{ borderColor, color: navText }}
+                  aria-label="Toggle menu"
+                  aria-expanded={mobileMenuOpen}
+                >
+                  {mobileMenuOpen ? "X" : "≡"}
+                </button>
+              ) : null}
+              <div className="inline-flex items-center gap-1 rounded bg-[#111111] px-2 py-1 md:px-2.5">
+                <span className="text-[12px] leading-none text-[#FFD700]">🏆</span>
+                <span className={`${jetMono.className} text-[10px] font-semibold text-[#F5F5F0] md:text-[11px]`}>
+                  {formatGp(user.gp_weekly)}
+                  <span className="hidden md:inline"> GP</span>
+                </span>
+              </div>
+              <div className="inline-flex items-center gap-1 rounded bg-[#111111] px-2 py-1 md:px-2.5">
+                <span className="text-[12px] leading-none text-[#00D4AA]">◈</span>
+                <span className={`${jetMono.className} text-[10px] font-semibold text-[#F5F5F0] md:text-[11px]`}>
+                  {user.challenge_tokens}
+                  <span className="hidden md:inline"> CT</span>
+                </span>
+              </div>
+              <div className="flex items-center gap-2 md:gap-3">
+                <p className={`${jetMono.className} text-[12px] md:text-[13px]`} style={{ color: navText }}>
                   {displayUsername}
                 </p>
                 <div className="inline-flex items-center gap-1.5 rounded bg-[#0D0D0D] px-2.5 py-1">
@@ -109,6 +167,22 @@ export function RootNav({ isLoggedIn, username, houseName, houseHex }: RootNavPr
           )}
         </div>
       </nav>
+      {showMiddleMenu && mobileMenuOpen ? (
+        <div className="border-t-[3px] px-4 py-3 md:hidden" style={{ borderColor }}>
+          <div className={`${jetMono.className} flex flex-col gap-2 text-[11px] font-semibold tracking-[0.08em]`}>
+            {MIDDLE_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={navLinkClass(link.href)}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </header>
   );
 }

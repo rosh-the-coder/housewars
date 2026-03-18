@@ -17,17 +17,19 @@ insert into games (
   name,
   thumbnail_url,
   embed_url,
-  source,
   type,
-  pts_per_minute,
+  difficulty,
+  difficulty_multiplier,
+  ct_reward,
   is_scored,
   is_active
 ) values (
   'Tsunami Brainrots Online',
   'https://img.gamedistribution.com/305d2a5605784aaf8587ffefc765e5cf-512x512.jpg',
   'https://html5.gamedistribution.com/305d2a5605784aaf8587ffefc765e5cf/',
-  'gamedistribution',
   'timed',
+  'medium',
+  1.00,
   10,
   false,
   true
