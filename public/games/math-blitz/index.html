@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Math Blitz</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        font-family: "Arial Black", Arial, sans-serif;
+        background: #f5f5f0;
+        color: #111111;
+      }
+
+      #app {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        border: 4px solid #111111;
+        background: linear-gradient(180deg, #f5f5f0 0%, #f5f5f0 70%, #efeadd 100%);
+      }
+
+      .hud {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        background: #111111;
+        border: 3px solid #111111;
+        color: #f5f5f0;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        z-index: 10;
+      }
+
+      #scoreBarTrack {
+        position: absolute;
+        top: 54px;
+        left: 12px;
+        right: 12px;
+        height: 12px;
+        border: 3px solid #111111;
+        background: #e0e0d8;
+        z-index: 10;
+      }
+
+      #scoreBarFill {
+        width: 0%;
+        height: 100%;
+        background: #22c55e;
+      }
+
+      .center {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        padding: 24px;
+      }
+
+      #message {
+        z-index: 2;
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+      }
+
+      #instructionWrap {
+        display: none;
+        z-index: 12;
+      }
+
+      .panel {
+        width: min(720px, 94%);
+        background: #f5f5f0;
+        border: 4px solid #111111;
+        box-shadow: 8px 8px 0 #111111;
+        padding: 16px;
+        text-transform: uppercase;
+      }
+
+      .panel h2 {
+        margin: 0 0 8px;
+        font-size: 24px;
+        letter-spacing: 0.04em;
+      }
+
+      .panel p {
+        margin: 0 0 10px;
+        font-family: Arial, sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+      }
+
+      .difficulty-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin: 10px 0 14px;
+      }
+
+      .difficulty-btn {
+        padding: 10px 8px;
+        border: 3px solid #111111;
+        background: #ffffff;
+        box-shadow: 8px 8px 0 #111111;
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      .difficulty-btn.active {
+        background: #111111;
+        color: #f5f5f0;
+      }
+
+      .start-btn {
+        width: 100%;
+        padding: 12px;
+        border: 3px solid #111111;
+        background: #ffd700;
+        box-shadow: 8px 8px 0 #111111;
+        font-size: 14px;
+        font-weight: 900;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      #gameWrap {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 92px 24px 24px;
+      }
+
+      .game-stack {
+        width: min(980px, 100%);
+        display: grid;
+        gap: 18px;
+        justify-items: center;
+      }
+
+      #equationText {
+        font-size: clamp(44px, 9vw, 120px);
+        line-height: 1;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      #answerForm {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      #answerInput {
+        width: min(280px, 92vw);
+        padding: 14px 16px;
+        border: 4px solid #111111;
+        box-shadow: 8px 8px 0 #111111;
+        background: #ffffff;
+        color: #111111;
+        font-family: "Arial Black", Arial, sans-serif;
+        font-size: 26px;
+        text-align: center;
+        outline: none;
+      }
+
+      #checkBtn {
+        padding: 14px 20px;
+        border: 4px solid #111111;
+        box-shadow: 8px 8px 0 #111111;
+        background: #ffffff;
+        color: #111111;
+        font-family: "Arial Black", Arial, sans-serif;
+        font-size: 18px;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      #feedback {
+        min-height: 34px;
+        font-size: 34px;
+        line-height: 1;
+      }
+
+      #flashOverlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0;
+        z-index: 9;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="app">
+      <div class="hud">
+        <span id="correctText">Correct: 0</span>
+        <span id="wrongText">Wrong: 0</span>
+        <span id="timeText">Time: 90s</span>
+        <span id="accuracyText">Accuracy: 0%</span>
+      </div>
+      <div id="scoreBarTrack"><div id="scoreBarFill"></div></div>
+
+      <div class="center">
+        <div id="message">WAITING FOR GAME TO START...</div>
+      </div>
+
+      <div class="center" id="instructionWrap">
+        <div class="panel">
+          <h2>Math Blitz // Briefing</h2>
+          <p>Solve as many equations as possible in 90 seconds.</p>
+          <p id="difficultyText">Easy: + and - only with numbers 1-20.</p>
+          <div class="difficulty-row">
+            <button class="difficulty-btn active" data-difficulty="easy">Easy</button>
+            <button class="difficulty-btn" data-difficulty="medium">Medium</button>
+            <button class="difficulty-btn" data-difficulty="hard">Hard</button>
+          </div>
+          <button class="start-btn" id="startBtn">Start Blitz</button>
+        </div>
+      </div>
+
+      <div id="gameWrap">
+        <div class="game-stack">
+          <div id="equationText">0 + 0 = ?</div>
+          <form id="answerForm" autocomplete="off">
+            <input id="answerInput" type="number" aria-label="Answer" />
+            <button id="checkBtn" type="submit">Check</button>
+          </form>
+          <div id="feedback"></div>
+        </div>
+      </div>
+      <div id="flashOverlay"></div>
+    </main>
+
+    <script>
+      (function () {
+        const ROUND_SECONDS = 90;
+        const messageEl = document.getElementById("message");
+        const instructionWrapEl = document.getElementById("instructionWrap");
+        const difficultyTextEl = document.getElementById("difficultyText");
+        const difficultyButtons = document.querySelectorAll(".difficulty-btn");
+        const startBtnEl = document.getElementById("startBtn");
+        const gameWrapEl = document.getElementById("gameWrap");
+        const equationTextEl = document.getElementById("equationText");
+        const answerFormEl = document.getElementById("answerForm");
+        const answerInputEl = document.getElementById("answerInput");
+        const feedbackEl = document.getElementById("feedback");
+        const correctTextEl = document.getElementById("correctText");
+        const wrongTextEl = document.getElementById("wrongText");
+        const timeTextEl = document.getElementById("timeText");
+        const accuracyTextEl = document.getElementById("accuracyText");
+        const scoreBarFillEl = document.getElementById("scoreBarFill");
+        const flashOverlayEl = document.getElementById("flashOverlay");
+
+        let gameReady = false;
+        let started = false;
+        let difficulty = "easy";
+        let houseColor = "#22c55e";
+        let correctCount = 0;
+        let wrongCount = 0;
+        let timeLeft = ROUND_SECONDS;
+        let currentAnswer = 0;
+        let gameTimerId = null;
+        let feedbackTimerId = null;
+        let flashTimerId = null;
+
+        function randomInt(min, max) {
+          return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function generateEasyEquation() {
+          const isAdd = Math.random() < 0.5;
+          if (isAdd) {
+            const a = randomInt(1, 20);
+            const b = randomInt(1, 20);
+            return {
+              text: a + " + " + b + " = ?",
+              answer: a + b,
+            };
+          }
+
+          let a = randomInt(1, 20);
+          let b = randomInt(1, 20);
+          if (b > a) {
+            const temp = a;
+            a = b;
+            b = temp;
+          }
+          return {
+            text: a + " - " + b + " = ?",
+            answer: a - b,
+          };
+        }
+
+        function generateMediumEquation() {
+          const isMultiply = Math.random() < 0.6;
+          if (isMultiply) {
+            const a = randomInt(2, 12);
+            const b = randomInt(2, 12);
+            return {
+              text: a + " x " + b + " = ?",
+              answer: a * b,
+            };
+          }
+
+          const divisor = randomInt(2, 12);
+          const quotient = randomInt(2, 12);
+          const dividend = divisor * quotient;
+          return {
+            text: dividend + " / " + divisor + " = ?",
+            answer: quotient,
+          };
+        }
+
+        function generateHardEquation() {
+          const variant = Math.random() < 0.5 ? "mulAdd" : "divMul";
+          if (variant === "mulAdd") {
+            const a = randomInt(11, 24);
+            const b = randomInt(3, 12);
+            const c = randomInt(2, 18);
+            return {
+              text: a + " x " + b + " + " + c + " = ?",
+              answer: a * b + c,
+            };
+          }
+
+          const divisor = randomInt(6, 16);
+          const base = randomInt(8, 20);
+          const left = divisor * base;
+          const multiplier = randomInt(2, 9);
+          return {
+            text: left + " / " + divisor + " x " + multiplier + " = ?",
+            answer: base * multiplier,
+          };
+        }
+
+        function nextEquation() {
+          let eq;
+          if (difficulty === "easy") {
+            eq = generateEasyEquation();
+          } else if (difficulty === "medium") {
+            eq = generateMediumEquation();
+          } else {
+            eq = generateHardEquation();
+          }
+          currentAnswer = eq.answer;
+          equationTextEl.textContent = eq.text;
+          answerInputEl.value = "";
+          answerInputEl.focus();
+        }
+
+        function clearTimers() {
+          if (gameTimerId) {
+            clearInterval(gameTimerId);
+            gameTimerId = null;
+          }
+          if (feedbackTimerId) {
+            clearTimeout(feedbackTimerId);
+            feedbackTimerId = null;
+          }
+          if (flashTimerId) {
+            clearTimeout(flashTimerId);
+            flashTimerId = null;
+          }
+        }
+
+        function updateHud() {
+          const total = correctCount + wrongCount;
+          const accuracy = total === 0 ? 0 : Math.round((correctCount / total) * 100);
+          correctTextEl.textContent = "Correct: " + correctCount;
+          wrongTextEl.textContent = "Wrong: " + wrongCount;
+          timeTextEl.textContent = "Time: " + Math.max(0, timeLeft) + "s";
+          accuracyTextEl.textContent = "Accuracy: " + accuracy + "%";
+          scoreBarFillEl.style.width = Math.min(100, correctCount) + "%";
+        }
+
+        function flashBackground(color) {
+          flashOverlayEl.style.background = color;
+          flashOverlayEl.style.opacity = "0.45";
+          if (flashTimerId) {
+            clearTimeout(flashTimerId);
+          }
+          flashTimerId = window.setTimeout(function () {
+            flashOverlayEl.style.opacity = "0";
+          }, 200);
+        }
+
+        function showFeedback(symbol, color) {
+          feedbackEl.textContent = symbol;
+          feedbackEl.style.color = color;
+          if (feedbackTimerId) {
+            clearTimeout(feedbackTimerId);
+          }
+          feedbackTimerId = window.setTimeout(function () {
+            feedbackEl.textContent = "";
+          }, 220);
+        }
+
+        function sendResult() {
+          window.parent.postMessage(
+            {
+              type: "HOUSEWARS_GAME_OVER",
+              payload: {
+                metric_type: "score",
+                metric_value: correctCount,
+              },
+            },
+            "*",
+          );
+        }
+
+        function finishGame() {
+          if (!started) return;
+          started = false;
+          clearTimers();
+          answerInputEl.disabled = true;
+          equationTextEl.textContent = "BLITZ OVER";
+          feedbackEl.style.color = "#111111";
+          feedbackEl.textContent = "BLITZ OVER - " + correctCount + " CORRECT ANSWERS";
+          updateHud();
+          window.setTimeout(sendResult, 2000);
+        }
+
+        function startGame() {
+          if (!gameReady || started) return;
+          started = true;
+          correctCount = 0;
+          wrongCount = 0;
+          timeLeft = ROUND_SECONDS;
+          clearTimers();
+          updateHud();
+          instructionWrapEl.style.display = "none";
+          messageEl.textContent = "";
+          gameWrapEl.style.display = "flex";
+          answerInputEl.disabled = false;
+          feedbackEl.textContent = "";
+          nextEquation();
+
+          gameTimerId = window.setInterval(function () {
+            timeLeft -= 1;
+            updateHud();
+            if (timeLeft <= 0) {
+              finishGame();
+            }
+          }, 1000);
+        }
+
+        function updateDifficultyText() {
+          if (difficulty === "easy") {
+            difficultyTextEl.textContent = "Easy: + and - only with numbers 1-20.";
+          } else if (difficulty === "medium") {
+            difficultyTextEl.textContent = "Medium: x tables 2-12 and simple division.";
+          } else {
+            difficultyTextEl.textContent = "Hard: multi-step equations with larger numbers.";
+          }
+        }
+
+        difficultyButtons.forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            const selected = btn.getAttribute("data-difficulty");
+            if (!selected) return;
+            difficulty = selected;
+            difficultyButtons.forEach(function (node) {
+              node.classList.remove("active");
+            });
+            btn.classList.add("active");
+            updateDifficultyText();
+          });
+        });
+
+        startBtnEl.addEventListener("click", startGame);
+
+        answerFormEl.addEventListener("submit", function (event) {
+          event.preventDefault();
+          if (!started) return;
+          const raw = answerInputEl.value.trim();
+          if (!raw.length) return;
+          const value = Number(raw);
+          if (!Number.isFinite(value)) return;
+
+          if (value === currentAnswer) {
+            correctCount += 1;
+            updateHud();
+            showFeedback("✓", houseColor);
+            flashBackground(houseColor);
+            nextEquation();
+          } else {
+            wrongCount += 1;
+            updateHud();
+            showFeedback("✗", "#ef4444");
+            flashBackground("#ef4444");
+          }
+        });
+
+        window.addEventListener("message", function (event) {
+          if (!event.data || typeof event.data !== "object") return;
+          if (event.data.type !== "HOUSEWARS_GAME_START") return;
+          if (started) return;
+
+          const payload = event.data.payload || {};
+          if (typeof payload.house_color === "string" && payload.house_color.trim()) {
+            houseColor = payload.house_color.trim();
+          }
+
+          gameReady = true;
+          started = false;
+          correctCount = 0;
+          wrongCount = 0;
+          timeLeft = ROUND_SECONDS;
+          clearTimers();
+          updateDifficultyText();
+          updateHud();
+          scoreBarFillEl.style.background = houseColor;
+          messageEl.textContent = "Choose difficulty and start your blitz";
+          instructionWrapEl.style.display = "grid";
+          gameWrapEl.style.display = "none";
+          feedbackEl.textContent = "";
+        });
+      })();
+    </script>
+  </body>
+</html>

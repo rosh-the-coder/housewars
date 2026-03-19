@@ -8,6 +8,10 @@ type GameEmbedProps = {
   embedUrl: string;
   title: string;
   sessionGameId: string;
+  challengeContext?: {
+    id: string;
+    title: string;
+  } | null;
   user: {
     username: string;
     house: {
@@ -38,10 +42,17 @@ type SessionEndPayload = {
   house_color?: string;
 };
 
+type ChallengeSubmitPayload = {
+  rank?: number | null;
+  total_players?: number | null;
+  best_score?: number | null;
+};
+
 export function GameEmbed({
   embedUrl,
   title,
   sessionGameId,
+  challengeContext = null,
   user,
   showExitButton = true,
   iframeClassName = "h-[520px] w-full rounded-lg border border-zinc-300 bg-black",
@@ -62,6 +73,9 @@ export function GameEmbed({
     weeklyGpTotal: number;
     ctBalance: number;
     accentColor: string;
+    challengeRank: number | null;
+    challengeTotalPlayers: number;
+    challengeBestScore: number;
   }>({
     rank: "-",
     totalPlayers: 0,
@@ -72,6 +86,9 @@ export function GameEmbed({
     weeklyGpTotal: 0,
     ctBalance: 0,
     accentColor: "#DC2626",
+    challengeRank: null,
+    challengeTotalPlayers: 0,
+    challengeBestScore: 0,
   });
   const [dismissCountdown, setDismissCountdown] = useState(10);
   const [modalOpenedAtMs, setModalOpenedAtMs] = useState<number | null>(null);
@@ -136,6 +153,22 @@ export function GameEmbed({
       }
 
       const payload = (await response.json()) as SessionEndPayload;
+      let challengeStats: ChallengeSubmitPayload | null = null;
+      if (challengeContext?.id) {
+        const submitResponse = await fetch(`/api/challenges/${challengeContext.id}/submit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ score: Math.max(0, Math.round(metricValue)) }),
+        });
+        if (submitResponse.ok) {
+          challengeStats = (await submitResponse.json()) as ChallengeSubmitPayload;
+        } else {
+          const challengeError = (await submitResponse.json().catch(() => ({}))) as { error?: string };
+          toast.error(challengeError.error ?? "Could not submit challenge score");
+        }
+      }
+
       setDismissCountdown(10);
       setModalOpenedAtMs(Date.now());
       setResult({
@@ -148,6 +181,9 @@ export function GameEmbed({
         weeklyGpTotal: Number(payload.weekly_gp_total ?? 0),
         ctBalance: Number(payload.ct_balance ?? 0),
         accentColor: payload.house_color ?? "#DC2626",
+        challengeRank: Number(challengeStats?.rank ?? 0) || null,
+        challengeTotalPlayers: Number(challengeStats?.total_players ?? 0),
+        challengeBestScore: Number(challengeStats?.best_score ?? 0),
       });
       setIsResultModalOpen(true);
       router.refresh();
@@ -157,7 +193,7 @@ export function GameEmbed({
       sessionIdRef.current = null;
       isEndingRef.current = false;
     }
-  }, [router]);
+  }, [challengeContext?.id, router]);
 
   const onFrameLoad = useCallback(async () => {
     const iframeWindow = iframeRef.current?.contentWindow;
@@ -209,7 +245,7 @@ export function GameEmbed({
       setDismissCountdown(remaining);
       if (remaining === 0) {
         setIsResultModalOpen(false);
-        router.push("/games");
+        router.push(challengeContext?.id ? "/challenges" : "/games");
         router.refresh();
       }
     }, 250);
@@ -217,7 +253,7 @@ export function GameEmbed({
     return () => {
       window.clearInterval(timer);
     };
-  }, [isResultModalOpen, modalOpenedAtMs, router]);
+  }, [challengeContext?.id, isResultModalOpen, modalOpenedAtMs, router]);
 
   if (!embedUrl) {
     return (
@@ -233,7 +269,7 @@ export function GameEmbed({
         <div className="mb-3 flex items-center justify-end">
           <button
             type="button"
-            onClick={() => router.push("/games")}
+            onClick={() => router.push(challengeContext?.id ? "/challenges" : "/games")}
             className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white"
           >
             Exit Game
@@ -264,6 +300,12 @@ export function GameEmbed({
               <p className="text-sm font-semibold tracking-[0.08em] text-[#F5F5F0]">
                 RANK #{result.rank} OF {result.totalPlayers} PLAYERS
               </p>
+              {challengeContext?.id ? (
+                <p className="mt-2 text-xs font-semibold tracking-[0.08em] text-[#00D4AA]">
+                  CHALLENGE RANK #{result.challengeRank ?? "--"} OF {result.challengeTotalPlayers || "--"} | BEST{" "}
+                  {result.challengeBestScore}
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-2 border-b-[3px] border-[#0D0D0D] px-5 py-4">
@@ -316,12 +358,12 @@ export function GameEmbed({
                   type="button"
                   onClick={() => {
                     setIsResultModalOpen(false);
-                    router.push("/games");
+                    router.push(challengeContext?.id ? "/challenges" : "/games");
                     router.refresh();
                   }}
                   className="bg-[#F5F5F0] px-4 py-2 text-sm font-semibold text-[#111111]"
                 >
-                  LOBBY
+                  {challengeContext?.id ? "CHALLENGES" : "LOBBY"}
                 </button>
               </div>
             </div>

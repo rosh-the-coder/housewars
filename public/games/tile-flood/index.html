@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tile Flood</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        font-family: "Arial Black", Arial, sans-serif;
+        background: #f5f5f0;
+        color: #111111;
+      }
+
+      #app {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        border: 4px solid #111111;
+        background: linear-gradient(180deg, #f5f5f0 0%, #f5f5f0 70%, #efeadd 100%);
+      }
+
+      .hud {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        background: #111111;
+        border: 3px solid #111111;
+        color: #f5f5f0;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        z-index: 10;
+      }
+
+      .center {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        padding: 24px;
+        pointer-events: none;
+      }
+
+      #message {
+        z-index: 2;
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      #instructionWrap {
+        display: none;
+        z-index: 12;
+        pointer-events: auto;
+      }
+
+      .panel {
+        width: min(740px, 94%);
+        background: #f5f5f0;
+        border: 4px solid #111111;
+        box-shadow: 8px 8px 0 #111111;
+        padding: 16px;
+        text-transform: uppercase;
+      }
+
+      .panel h2 {
+        margin: 0 0 8px;
+        font-size: 24px;
+        letter-spacing: 0.04em;
+      }
+
+      .panel p {
+        margin: 0 0 10px;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .difficulty-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin: 10px 0 14px;
+      }
+
+      .difficulty-btn {
+        padding: 10px 8px;
+        border: 3px solid #111111;
+        box-shadow: 8px 8px 0 #111111;
+        background: #ffffff;
+        color: #111111;
+        text-transform: uppercase;
+        font-family: "Arial Black", Arial, sans-serif;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .difficulty-btn.active {
+        background: #111111;
+        color: #f5f5f0;
+      }
+
+      .start-btn {
+        width: 100%;
+        padding: 12px;
+        border: 3px solid #111111;
+        box-shadow: 8px 8px 0 #111111;
+        background: #ffd700;
+        color: #111111;
+        text-transform: uppercase;
+        font-family: "Arial Black", Arial, sans-serif;
+        font-size: 14px;
+        cursor: pointer;
+      }
+
+      #gameWrap {
+        position: absolute;
+        inset: 0;
+        display: none;
+        grid-template-rows: 1fr auto;
+        padding: 86px 20px 20px;
+        gap: 14px;
+        overflow: auto;
+      }
+
+      #gridWrap {
+        display: grid;
+        place-items: center;
+      }
+
+      #grid {
+        width: min(84vw, 620px);
+        aspect-ratio: 1 / 1;
+        border: 4px solid #111111;
+        box-shadow: 8px 8px 0 #111111;
+        display: grid;
+        gap: 0;
+        overflow: hidden;
+      }
+
+      .tile {
+        border: 1.5px solid #111111;
+      }
+
+      .tile-btn {
+        width: 100%;
+        height: 100%;
+        border: 1.5px solid #111111;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+        cursor: pointer;
+      }
+
+      #controls {
+        display: grid;
+        gap: 10px;
+      }
+
+      #movesRow {
+        display: flex;
+        justify-content: center;
+        gap: 18px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-size: 22px;
+      }
+
+      #palette {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .color-btn {
+        aspect-ratio: 1 / 1;
+        border: 4px solid #111111;
+        border-radius: 8px;
+        background: #ffffff;
+        cursor: pointer;
+        box-shadow: 0 0 0 #111111;
+        transition: transform 0.08s ease;
+      }
+
+      .color-btn:hover:not(:disabled) {
+        box-shadow: 5px 5px 0 #111111;
+        transform: translate(-1px, -1px);
+      }
+
+      .color-btn:focus-visible {
+        outline: 3px dashed #111111;
+        outline-offset: 2px;
+      }
+
+      .color-btn.selected {
+        box-shadow: 8px 8px 0 #111111;
+        transform: translate(-2px, -2px);
+      }
+
+      .color-btn:disabled {
+        cursor: default;
+        opacity: 0.48;
+      }
+
+      #flashOverlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0;
+        z-index: 9;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="app">
+      <div class="hud">
+        <span id="movesHudText">Moves: 0</span>
+        <span id="parHudText">Par: 20</span>
+        <span id="difficultyHudText">Difficulty: Easy</span>
+      </div>
+
+      <div id="flashOverlay"></div>
+
+      <div class="center">
+        <div id="message">WAITING FOR GAME TO START...</div>
+      </div>
+
+      <div class="center" id="instructionWrap">
+        <div class="panel">
+          <h2>Tile Flood // Briefing</h2>
+          <p>Flood from top-left: pick colors to make the whole grid one color.</p>
+          <p id="difficultyText">Easy: 8x8 grid, 5 colors, par 20.</p>
+          <div class="difficulty-row">
+            <button class="difficulty-btn active" data-difficulty="easy">Easy</button>
+            <button class="difficulty-btn" data-difficulty="medium">Medium</button>
+            <button class="difficulty-btn" data-difficulty="hard">Hard</button>
+          </div>
+          <button class="start-btn" id="startBtn">Start Flood</button>
+        </div>
+      </div>
+
+      <div id="gameWrap">
+        <div id="gridWrap"><div id="grid"></div></div>
+        <div id="controls">
+          <div id="movesRow">
+            <span id="movesText">MOVES: 0</span>
+            <span id="parText">PAR: 20</span>
+          </div>
+          <div id="palette">
+            <button class="color-btn" data-index="0" style="background:#DC2626" aria-label="Red"></button>
+            <button class="color-btn" data-index="1" style="background:#2563EB" aria-label="Blue"></button>
+            <button class="color-btn" data-index="2" style="background:#16A34A" aria-label="Green"></button>
+            <button class="color-btn" data-index="3" style="background:#CA8A04" aria-label="Yellow"></button>
+            <button class="color-btn" data-index="4" style="background:#7C3AED" aria-label="Purple"></button>
+            <button class="color-btn" data-index="5" style="background:#0891B2" aria-label="Cyan"></button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      (function () {
+        const COLOR_POOL = ["#DC2626", "#2563EB", "#16A34A", "#CA8A04", "#7C3AED", "#0891B2"];
+        const DIFFICULTY = {
+          easy: { size: 8, colorCount: 5, par: 20, label: "Easy" },
+          medium: { size: 12, colorCount: 6, par: 35, label: "Medium" },
+          hard: { size: 16, colorCount: 6, par: 50, label: "Hard" },
+        };
+
+        const messageEl = document.getElementById("message");
+        const instructionWrapEl = document.getElementById("instructionWrap");
+        const difficultyTextEl = document.getElementById("difficultyText");
+        const difficultyButtons = document.querySelectorAll(".difficulty-btn");
+        const startBtnEl = document.getElementById("startBtn");
+        const gameWrapEl = document.getElementById("gameWrap");
+        const gridEl = document.getElementById("grid");
+        const controlsEl = document.getElementById("controls");
+        const movesTextEl = document.getElementById("movesText");
+        const parTextEl = document.getElementById("parText");
+        const movesHudTextEl = document.getElementById("movesHudText");
+        const parHudTextEl = document.getElementById("parHudText");
+        const difficultyHudTextEl = document.getElementById("difficultyHudText");
+        const flashOverlayEl = document.getElementById("flashOverlay");
+        const colorButtons = document.querySelectorAll(".color-btn");
+
+        let gameReady = false;
+        let started = false;
+        let difficulty = "easy";
+        let houseColor = "#16A34A";
+        let gridData = [];
+        let moveCount = 0;
+        let activeColor = "";
+        let flashTimerId = null;
+
+        function fitGridSize() {
+          if (!gameWrapEl || !gridEl || !controlsEl) return;
+          const style = window.getComputedStyle(gameWrapEl);
+          const gap = Number.parseFloat(style.gap) || 0;
+          const availableWidth = gameWrapEl.clientWidth - 8;
+          const availableHeight = gameWrapEl.clientHeight - controlsEl.offsetHeight - gap - 8;
+          const size = Math.max(180, Math.floor(Math.min(availableWidth, availableHeight, 620)));
+          gridEl.style.width = size + "px";
+        }
+
+        function getSelectedDifficulty() {
+          const active = document.querySelector(".difficulty-btn.active");
+          if (!active) return "easy";
+          const selected = active.getAttribute("data-difficulty");
+          if (!selected || !DIFFICULTY[selected]) return "easy";
+          return selected;
+        }
+
+        function updateDifficultyText() {
+          if (difficulty === "easy") {
+            difficultyTextEl.textContent = "Easy: 8x8 grid, 5 colors, par 20.";
+          } else if (difficulty === "medium") {
+            difficultyTextEl.textContent = "Medium: 12x12 grid, 6 colors, par 35.";
+          } else {
+            difficultyTextEl.textContent = "Hard: 16x16 grid, 6 colors, par 50.";
+          }
+        }
+
+        function updateCounters() {
+          const cfg = DIFFICULTY[difficulty];
+          movesTextEl.textContent = "MOVES: " + moveCount;
+          parTextEl.textContent = "PAR: " + cfg.par;
+          movesHudTextEl.textContent = "Moves: " + moveCount;
+          parHudTextEl.textContent = "Par: " + cfg.par;
+          difficultyHudTextEl.textContent = "Difficulty: " + cfg.label;
+        }
+
+        function randomInt(maxExclusive) {
+          return Math.floor(Math.random() * maxExclusive);
+        }
+
+        function generateGrid() {
+          const cfg = DIFFICULTY[difficulty];
+          const palette = COLOR_POOL.slice(0, cfg.colorCount);
+          gridData = [];
+          for (let row = 0; row < cfg.size; row += 1) {
+            const line = [];
+            for (let col = 0; col < cfg.size; col += 1) {
+              line.push(palette[randomInt(palette.length)]);
+            }
+            gridData.push(line);
+          }
+          activeColor = gridData[0][0];
+        }
+
+        function renderGrid() {
+          const size = gridData.length;
+          gridEl.innerHTML = "";
+          gridEl.style.gridTemplateColumns = "repeat(" + size + ", minmax(0, 1fr))";
+          for (let row = 0; row < size; row += 1) {
+            for (let col = 0; col < size; col += 1) {
+              const tile = document.createElement("button");
+              tile.className = "tile";
+              tile.classList.add("tile-btn");
+              tile.type = "button";
+              tile.style.background = gridData[row][col];
+              tile.setAttribute("aria-label", "Grid tile " + (row + 1) + "," + (col + 1));
+              tile.addEventListener("click", function () {
+                const color = gridData[row][col];
+                const colorIndex = COLOR_POOL.indexOf(color);
+                if (colorIndex >= 0) {
+                  useColor(colorIndex);
+                }
+              });
+              gridEl.appendChild(tile);
+            }
+          }
+        }
+
+        function setPaletteState() {
+          const cfg = DIFFICULTY[difficulty];
+          colorButtons.forEach(function (btn) {
+            const index = Number(btn.getAttribute("data-index"));
+            const color = COLOR_POOL[index];
+            const isEnabled = index < cfg.colorCount;
+            btn.disabled = !started || !isEnabled;
+            btn.classList.toggle("selected", isEnabled && color === activeColor);
+          });
+        }
+
+        function isComplete() {
+          const target = gridData[0][0];
+          for (let row = 0; row < gridData.length; row += 1) {
+            for (let col = 0; col < gridData[row].length; col += 1) {
+              if (gridData[row][col] !== target) return false;
+            }
+          }
+          return true;
+        }
+
+        function floodFill(grid, targetColor, newColor) {
+          if (targetColor === newColor) return;
+          const startColor = grid[0][0];
+          function fill(row, col) {
+            if (row < 0 || row >= grid.length) return;
+            if (col < 0 || col >= grid[0].length) return;
+            if (grid[row][col] !== startColor) return;
+            grid[row][col] = newColor;
+            fill(row + 1, col);
+            fill(row - 1, col);
+            fill(row, col + 1);
+            fill(row, col - 1);
+          }
+          fill(0, 0);
+        }
+
+        function flash(color) {
+          flashOverlayEl.style.background = color;
+          flashOverlayEl.style.opacity = "0.34";
+          if (flashTimerId) clearTimeout(flashTimerId);
+          flashTimerId = window.setTimeout(function () {
+            flashOverlayEl.style.opacity = "0";
+          }, 240);
+        }
+
+        function finishGame() {
+          started = false;
+          setPaletteState();
+          flash(houseColor);
+          messageEl.textContent = "COMPLETE IN " + moveCount + " MOVES";
+
+          const metricValue = Math.max(0, 100 - moveCount);
+          window.setTimeout(function () {
+            window.parent.postMessage(
+              {
+                type: "HOUSEWARS_GAME_OVER",
+                payload: {
+                  metric_type: "score",
+                  metric_value: metricValue,
+                },
+              },
+              "*",
+            );
+          }, 2000);
+        }
+
+        function useColor(index) {
+          if (!started) return;
+          const cfg = DIFFICULTY[difficulty];
+          if (index < 0 || index >= cfg.colorCount) return;
+          const nextColor = COLOR_POOL[index];
+          const currentColor = gridData[0][0];
+          floodFill(gridData, currentColor, nextColor);
+          activeColor = gridData[0][0];
+          moveCount += 1;
+          updateCounters();
+          renderGrid();
+          setPaletteState();
+          if (isComplete()) {
+            finishGame();
+          }
+        }
+
+        function startGame() {
+          if (!gameReady || started) return;
+          difficulty = getSelectedDifficulty();
+          started = true;
+          moveCount = 0;
+          messageEl.textContent = "";
+          instructionWrapEl.style.display = "none";
+          gameWrapEl.style.display = "grid";
+          generateGrid();
+          updateCounters();
+          renderGrid();
+          fitGridSize();
+          setPaletteState();
+        }
+
+        difficultyButtons.forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            const nextDifficulty = btn.getAttribute("data-difficulty");
+            if (!nextDifficulty) return;
+            difficulty = nextDifficulty;
+            difficultyButtons.forEach(function (item) {
+              item.classList.remove("active");
+            });
+            btn.classList.add("active");
+            updateDifficultyText();
+            updateCounters();
+            setPaletteState();
+          });
+        });
+
+        colorButtons.forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            const index = Number(btn.getAttribute("data-index"));
+            useColor(index);
+          });
+        });
+
+        startBtnEl.addEventListener("click", startGame);
+
+        window.addEventListener("resize", fitGridSize);
+
+        window.addEventListener("message", function (event) {
+          if (!event.data || typeof event.data !== "object") return;
+          if (event.data.type !== "HOUSEWARS_GAME_START") return;
+          if (started) return;
+
+          const payload = event.data.payload || {};
+          if (typeof payload.house_color === "string" && payload.house_color.trim()) {
+            houseColor = payload.house_color.trim();
+          }
+
+          gameReady = true;
+          started = false;
+          difficulty = getSelectedDifficulty();
+          moveCount = 0;
+          updateDifficultyText();
+          updateCounters();
+          gameWrapEl.style.display = "none";
+          instructionWrapEl.style.display = "grid";
+          messageEl.textContent = "Choose difficulty and start flood";
+          setPaletteState();
+        });
+      })();
+    </script>
+  </body>
+</html>

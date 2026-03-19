@@ -13,6 +13,7 @@ const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["500", "700"] 
 
 type GamePageProps = {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ challenge_id?: string }>;
 };
 
 type DbGame = {
@@ -80,8 +81,10 @@ function toLocaleScore(value: number): string {
   return value.toLocaleString("en-US");
 }
 
-export default async function GamePage({ params }: GamePageProps) {
+export default async function GamePage({ params, searchParams }: GamePageProps) {
   const { slug } = await params;
+  const { challenge_id: challengeIdRaw } = await searchParams;
+  const challengeId = String(challengeIdRaw ?? "").trim();
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -207,6 +210,40 @@ export default async function GamePage({ params }: GamePageProps) {
         "LEAVE THE GAME PAGE TO LOCK IN YOUR SESSION SCORE",
       ];
 
+  let challengeContext: { id: string; title: string } | null = null;
+  if (challengeId) {
+    const [challengeAttempt, entryAttempt] = await Promise.all([
+      supabase
+        .from("challenges")
+        .select("id,title,status,ends_at,game_id")
+        .eq("id", challengeId)
+        .maybeSingle(),
+      supabase
+        .from("challenge_entries")
+        .select("id")
+        .eq("challenge_id", challengeId)
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    ]);
+    const challenge = challengeAttempt.data as
+      | {
+          id?: string;
+          title?: string | null;
+          status?: string | null;
+          ends_at?: string | null;
+          game_id?: string | null;
+        }
+      | null;
+    const isOpen = (challenge?.status ?? "").toLowerCase() === "open";
+    const matchesGame = String(challenge?.game_id ?? "") === game.id;
+    if (challenge?.id && entryAttempt.data?.id && isOpen && matchesGame) {
+      challengeContext = {
+        id: challenge.id,
+        title: String(challenge.title ?? "Challenge"),
+      };
+    }
+  }
+
   return (
     <section className="min-h-screen bg-[#F5F5F0]">
       <div className="flex h-16 w-full items-center justify-between bg-[#111111] px-5 md:px-10">
@@ -235,11 +272,19 @@ export default async function GamePage({ params }: GamePageProps) {
             </h1>
 
             <div className="overflow-hidden border-[3px] border-[#111111]">
+              {challengeContext ? (
+                <div className="border-b-[3px] border-[#111111] px-5 py-3" style={{ background: userHouseColor }}>
+                  <p className={`${plexMono.className} text-xs font-bold tracking-[0.08em] text-white`}>
+                    CHALLENGE ACTIVE - {challengeContext.title} | Your best score counts
+                  </p>
+                </div>
+              ) : null}
               <div id="game-preview" className="bg-[#111111] p-0">
                 <GameEmbed
                   embedUrl={game.embed_url}
                   title={game.name}
                   sessionGameId={game.id}
+                  challengeContext={challengeContext}
                   user={{
                     username: sdkPlayerName,
                     house: {

@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Memory Grid</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        font-family: "Arial Black", Arial, sans-serif;
+        background: #f5f5f0;
+        color: #111111;
+      }
+
+      #app {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        border: 4px solid #111111;
+        background: linear-gradient(180deg, #f5f5f0 0%, #f5f5f0 70%, #efeadd 100%);
+      }
+
+      .hud {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        background: #111111;
+        border: 3px solid #111111;
+        z-index: 10;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        color: #f5f5f0;
+        text-transform: uppercase;
+      }
+
+      .center {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        padding: 24px;
+      }
+
+      #message {
+        z-index: 2;
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      #instructionWrap {
+        display: none;
+        z-index: 12;
+      }
+
+      .panel {
+        width: min(700px, 94%);
+        background: #f5f5f0;
+        border: 4px solid #111111;
+        box-shadow: 8px 8px 0 #111111;
+        padding: 16px;
+        text-transform: uppercase;
+      }
+
+      .panel h2 {
+        margin: 0 0 8px;
+        font-size: 24px;
+        letter-spacing: 0.04em;
+      }
+
+      .panel p {
+        margin: 0 0 10px;
+        font-family: Arial, sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+      }
+
+      .difficulty-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin: 10px 0 14px;
+      }
+
+      .difficulty-btn {
+        padding: 10px 8px;
+        border: 3px solid #111111;
+        background: #ffffff;
+        box-shadow: 8px 8px 0 #111111;
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      .difficulty-btn.active {
+        background: #111111;
+        color: #f5f5f0;
+      }
+
+      .start-btn {
+        width: 100%;
+        padding: 12px;
+        border: 3px solid #111111;
+        background: #ffd700;
+        box-shadow: 8px 8px 0 #111111;
+        font-size: 14px;
+        font-weight: 900;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      #gameWrap {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 86px 18px 24px;
+      }
+
+      .game-frame {
+        width: min(760px, 100%);
+        display: grid;
+        gap: 16px;
+        justify-items: center;
+      }
+
+      #statusText {
+        font-size: 20px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        min-height: 24px;
+      }
+
+      #grid {
+        width: min(560px, 100%);
+        aspect-ratio: 1 / 1;
+        display: grid;
+        gap: 10px;
+      }
+
+      .tile {
+        border: 4px solid #111111;
+        border-radius: 8px;
+        box-shadow: 6px 6px 0 #111111;
+        background: #e0e0d8;
+        cursor: pointer;
+        transition: background 0.12s ease;
+      }
+
+      .tile:disabled {
+        cursor: default;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="app">
+      <div class="hud">
+        <span id="roundText">Round 0/10</span>
+        <span id="timeText">Time Elapsed: 0ms</span>
+        <span id="penaltyText">Penalties: 0ms</span>
+      </div>
+
+      <div class="center">
+        <div id="message">WAITING FOR GAME TO START...</div>
+      </div>
+
+      <div class="center" id="instructionWrap">
+        <div class="panel">
+          <h2>Memory Grid // Briefing</h2>
+          <p>Watch the pattern, then click tiles in exact order.</p>
+          <p>Wrong tile restarts round and adds +3000ms penalty.</p>
+          <p id="difficultyText">Easy: 3x3 grid, 3 tiles, 1.5s flash.</p>
+          <div class="difficulty-row">
+            <button class="difficulty-btn active" data-difficulty="easy">Easy</button>
+            <button class="difficulty-btn" data-difficulty="medium">Medium</button>
+            <button class="difficulty-btn" data-difficulty="hard">Hard</button>
+          </div>
+          <button class="start-btn" id="startBtn">Start Run (10 Rounds)</button>
+        </div>
+      </div>
+
+      <div id="gameWrap">
+        <div class="game-frame">
+          <div id="statusText"></div>
+          <div id="grid"></div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      (function () {
+        const TOTAL_ROUNDS = 10;
+        const WRONG_PENALTY_MS = 3000;
+        const DIFFICULTY = {
+          easy: { gridSize: 3, patternLength: 3, flashMs: 1500 },
+          medium: { gridSize: 4, patternLength: 5, flashMs: 1200 },
+          hard: { gridSize: 5, patternLength: 8, flashMs: 800 },
+        };
+
+        const messageEl = document.getElementById("message");
+        const instructionWrapEl = document.getElementById("instructionWrap");
+        const difficultyTextEl = document.getElementById("difficultyText");
+        const difficultyButtons = document.querySelectorAll(".difficulty-btn");
+        const startBtnEl = document.getElementById("startBtn");
+        const gameWrapEl = document.getElementById("gameWrap");
+        const statusTextEl = document.getElementById("statusText");
+        const gridEl = document.getElementById("grid");
+        const roundTextEl = document.getElementById("roundText");
+        const timeTextEl = document.getElementById("timeText");
+        const penaltyTextEl = document.getElementById("penaltyText");
+
+        let gameReady = false;
+        let started = false;
+        let difficulty = "easy";
+        let houseColor = "#22c55e";
+        let houseColorSoft = "rgba(34, 197, 94, 0.5)";
+        let currentRound = 0;
+        let penaltiesMs = 0;
+        let runStartAt = 0;
+        let finalTotalMs = 0;
+        let roundPatterns = [];
+        let currentPattern = [];
+        let currentInputIndex = 0;
+        let inputEnabled = false;
+        let tileButtons = [];
+        let elapsedTimerId = null;
+        let pendingTimeouts = [];
+
+        function parseColorWithAlpha(color, alpha) {
+          const trimmed = String(color).trim();
+          const hexMatch = trimmed.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+          if (hexMatch) {
+            let hex = hexMatch[1];
+            if (hex.length === 3) {
+              hex = hex
+                .split("")
+                .map(function (ch) {
+                  return ch + ch;
+                })
+                .join("");
+            }
+            const r = parseInt(hex.slice(0, 2), 16);
+            const g = parseInt(hex.slice(2, 4), 16);
+            const b = parseInt(hex.slice(4, 6), 16);
+            return "rgba(" + r + ", " + g + ", " + b + ", " + alpha + ")";
+          }
+          const rgbMatch = trimmed.match(/^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/);
+          if (rgbMatch) {
+            return "rgba(" + rgbMatch[1] + ", " + rgbMatch[2] + ", " + rgbMatch[3] + ", " + alpha + ")";
+          }
+          return trimmed;
+        }
+
+        function queueTimeout(callback, delayMs) {
+          const id = window.setTimeout(callback, delayMs);
+          pendingTimeouts.push(id);
+          return id;
+        }
+
+        function clearPendingTimeouts() {
+          while (pendingTimeouts.length) {
+            const id = pendingTimeouts.pop();
+            clearTimeout(id);
+          }
+        }
+
+        function clearElapsedTimer() {
+          if (elapsedTimerId) {
+            clearInterval(elapsedTimerId);
+            elapsedTimerId = null;
+          }
+        }
+
+        function nowElapsedMs() {
+          if (!started) return finalTotalMs;
+          return Math.round(performance.now() - runStartAt) + penaltiesMs;
+        }
+
+        function updateHud() {
+          roundTextEl.textContent = "Round " + currentRound + "/" + TOTAL_ROUNDS;
+          timeTextEl.textContent = "Time Elapsed: " + nowElapsedMs() + "ms";
+          penaltyTextEl.textContent = "Penalties: " + penaltiesMs + "ms";
+        }
+
+        function updateDifficultyText() {
+          if (difficulty === "easy") {
+            difficultyTextEl.textContent = "Easy: 3x3 grid, 3 tiles, 1.5s flash.";
+          } else if (difficulty === "medium") {
+            difficultyTextEl.textContent = "Medium: 4x4 grid, 5 tiles, 1.2s flash.";
+          } else {
+            difficultyTextEl.textContent = "Hard: 5x5 grid, 8 tiles, 0.8s flash.";
+          }
+        }
+
+        function setTileState(index, state) {
+          const tile = tileButtons[index];
+          if (!tile) return;
+          if (state === "flash") {
+            tile.style.background = houseColor;
+          } else if (state === "correct") {
+            tile.style.background = houseColorSoft;
+          } else if (state === "wrong") {
+            tile.style.background = "#ef4444";
+          } else {
+            tile.style.background = "#e0e0d8";
+          }
+        }
+
+        function resetAllTiles() {
+          for (let i = 0; i < tileButtons.length; i += 1) {
+            setTileState(i, "default");
+            tileButtons[i].disabled = !inputEnabled;
+          }
+        }
+
+        function setInputEnabled(value) {
+          inputEnabled = value;
+          for (let i = 0; i < tileButtons.length; i += 1) {
+            tileButtons[i].disabled = !value;
+          }
+        }
+
+        function randomUniqueIndices(totalTiles, count) {
+          const source = [];
+          for (let i = 0; i < totalTiles; i += 1) {
+            source.push(i);
+          }
+          for (let j = source.length - 1; j > 0; j -= 1) {
+            const k = Math.floor(Math.random() * (j + 1));
+            const temp = source[j];
+            source[j] = source[k];
+            source[k] = temp;
+          }
+          return source.slice(0, count);
+        }
+
+        function buildRoundPatterns() {
+          const config = DIFFICULTY[difficulty];
+          const totalTiles = config.gridSize * config.gridSize;
+          roundPatterns = [];
+          for (let i = 0; i < TOTAL_ROUNDS; i += 1) {
+            roundPatterns.push(randomUniqueIndices(totalTiles, config.patternLength));
+          }
+        }
+
+        function buildGrid() {
+          const config = DIFFICULTY[difficulty];
+          const totalTiles = config.gridSize * config.gridSize;
+          gridEl.innerHTML = "";
+          gridEl.style.gridTemplateColumns = "repeat(" + config.gridSize + ", minmax(0, 1fr))";
+          tileButtons = [];
+
+          for (let i = 0; i < totalTiles; i += 1) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "tile";
+            btn.setAttribute("aria-label", "Tile " + (i + 1));
+            btn.setAttribute("data-index", String(i));
+            btn.disabled = true;
+            btn.addEventListener("click", onTileClick);
+            gridEl.appendChild(btn);
+            tileButtons.push(btn);
+          }
+        }
+
+        function showPatternThenEnableInput() {
+          const config = DIFFICULTY[difficulty];
+          setInputEnabled(false);
+          resetAllTiles();
+          statusTextEl.textContent = "MEMORIZE PATTERN";
+
+          const steps = currentPattern.length;
+          const stepMs = Math.max(80, Math.floor(config.flashMs / steps));
+          for (let i = 0; i < steps; i += 1) {
+            const tileIndex = currentPattern[i];
+            queueTimeout(function () {
+              setTileState(tileIndex, "flash");
+            }, i * stepMs);
+            queueTimeout(function () {
+              setTileState(tileIndex, "default");
+            }, i * stepMs + Math.floor(stepMs * 0.75));
+          }
+
+          queueTimeout(function () {
+            resetAllTiles();
+            currentInputIndex = 0;
+            statusTextEl.textContent = "REPEAT THE ORDER";
+            setInputEnabled(true);
+          }, config.flashMs + 60);
+        }
+
+        function startRound(roundNumber) {
+          currentRound = roundNumber;
+          currentPattern = roundPatterns[currentRound - 1].slice();
+          updateHud();
+          showPatternThenEnableInput();
+        }
+
+        function flashAllTiles(color, durationMs, onDone) {
+          for (let i = 0; i < tileButtons.length; i += 1) {
+            tileButtons[i].style.background = color;
+          }
+          queueTimeout(function () {
+            resetAllTiles();
+            if (typeof onDone === "function") onDone();
+          }, durationMs);
+        }
+
+        function finishRun() {
+          started = false;
+          setInputEnabled(false);
+          clearPendingTimeouts();
+          clearElapsedTimer();
+          finalTotalMs = Math.round(performance.now() - runStartAt) + penaltiesMs;
+          updateHud();
+          statusTextEl.textContent = "COMPLETE - " + finalTotalMs + "MS TOTAL";
+
+          queueTimeout(function () {
+            window.parent.postMessage(
+              {
+                type: "HOUSEWARS_GAME_OVER",
+                payload: {
+                  metric_type: "time",
+                  metric_value: finalTotalMs,
+                },
+              },
+              "*",
+            );
+          }, 2000);
+        }
+
+        function restartCurrentRoundWithPenalty(wrongIndex) {
+          setInputEnabled(false);
+          penaltiesMs += WRONG_PENALTY_MS;
+          updateHud();
+          statusTextEl.textContent = "WRONG TILE - +3000MS PENALTY";
+          setTileState(wrongIndex, "wrong");
+          queueTimeout(function () {
+            resetAllTiles();
+            showPatternThenEnableInput();
+          }, 400);
+        }
+
+        function onTileClick(event) {
+          if (!started || !inputEnabled) return;
+          const tile = event.currentTarget;
+          const index = Number(tile.getAttribute("data-index"));
+          const expected = currentPattern[currentInputIndex];
+
+          if (index === expected) {
+            setTileState(index, "correct");
+            currentInputIndex += 1;
+            if (currentInputIndex >= currentPattern.length) {
+              setInputEnabled(false);
+              statusTextEl.textContent = "CORRECT";
+              flashAllTiles(houseColorSoft, 220, function () {
+                if (currentRound >= TOTAL_ROUNDS) {
+                  finishRun();
+                  return;
+                }
+                startRound(currentRound + 1);
+              });
+            }
+          } else {
+            restartCurrentRoundWithPenalty(index);
+          }
+        }
+
+        function startRun() {
+          if (!gameReady || started) return;
+          clearPendingTimeouts();
+          clearElapsedTimer();
+
+          started = true;
+          penaltiesMs = 0;
+          finalTotalMs = 0;
+          currentRound = 0;
+          runStartAt = performance.now();
+
+          instructionWrapEl.style.display = "none";
+          messageEl.textContent = "";
+          gameWrapEl.style.display = "flex";
+
+          buildGrid();
+          buildRoundPatterns();
+          startRound(1);
+          elapsedTimerId = window.setInterval(updateHud, 50);
+          updateHud();
+        }
+
+        difficultyButtons.forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            const nextDifficulty = btn.getAttribute("data-difficulty");
+            if (!nextDifficulty) return;
+            difficulty = nextDifficulty;
+            difficultyButtons.forEach(function (x) {
+              x.classList.remove("active");
+            });
+            btn.classList.add("active");
+            updateDifficultyText();
+          });
+        });
+
+        startBtnEl.addEventListener("click", startRun);
+
+        window.addEventListener("message", function (event) {
+          if (!event.data || typeof event.data !== "object") return;
+          if (event.data.type !== "HOUSEWARS_GAME_START") return;
+          if (started) return;
+
+          const payload = event.data.payload || {};
+          if (typeof payload.house_color === "string" && payload.house_color.trim()) {
+            houseColor = payload.house_color.trim();
+          }
+          houseColorSoft = parseColorWithAlpha(houseColor, 0.5);
+
+          gameReady = true;
+          started = false;
+          penaltiesMs = 0;
+          currentRound = 0;
+          finalTotalMs = 0;
+          clearPendingTimeouts();
+          clearElapsedTimer();
+          updateDifficultyText();
+          updateHud();
+          gameWrapEl.style.display = "none";
+          instructionWrapEl.style.display = "grid";
+          statusTextEl.textContent = "";
+          messageEl.textContent = "Choose difficulty and start your run";
+        });
+      })();
+    </script>
+  </body>
+</html>

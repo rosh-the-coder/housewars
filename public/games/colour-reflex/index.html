@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Colour Reflex</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        font-family: "Arial Black", Arial, sans-serif;
+        background: #0a0a0a;
+        color: #f5f5f0;
+      }
+
+      #app {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        border: 4px solid #f5f5f0;
+        background: linear-gradient(180deg, #0a0a0a 0%, #0f0f0f 60%, #151515 100%);
+      }
+
+      .hud {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border: 3px solid #f5f5f0;
+        background: #f5f5f0;
+        color: #0a0a0a;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        z-index: 10;
+      }
+
+      .center {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        padding: 24px;
+      }
+
+      #message {
+        z-index: 2;
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      #instructionWrap {
+        display: none;
+        z-index: 12;
+      }
+
+      .panel {
+        width: min(760px, 94%);
+        background: #0a0a0a;
+        border: 4px solid #f5f5f0;
+        box-shadow: 8px 8px 0 #f5f5f0;
+        padding: 16px;
+        text-transform: uppercase;
+      }
+
+      .panel h2 {
+        margin: 0 0 8px;
+        font-size: 24px;
+        letter-spacing: 0.04em;
+      }
+
+      .panel p {
+        margin: 0 0 10px;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .difficulty-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin: 10px 0 14px;
+      }
+
+      .difficulty-btn {
+        padding: 10px 8px;
+        border: 3px solid #f5f5f0;
+        box-shadow: 8px 8px 0 #f5f5f0;
+        background: #1b1b1b;
+        color: #f5f5f0;
+        text-transform: uppercase;
+        font-family: "Arial Black", Arial, sans-serif;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .difficulty-btn.active {
+        background: #f5f5f0;
+        color: #0a0a0a;
+      }
+
+      .start-btn {
+        width: 100%;
+        padding: 12px;
+        border: 3px solid #f5f5f0;
+        box-shadow: 8px 8px 0 #f5f5f0;
+        background: #f5f5f0;
+        color: #0a0a0a;
+        text-transform: uppercase;
+        font-family: "Arial Black", Arial, sans-serif;
+        font-size: 14px;
+        cursor: pointer;
+      }
+
+      #gameWrap {
+        position: absolute;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: space-between;
+        padding: 92px 18px 20px;
+      }
+
+      #wordArea {
+        flex: 1;
+        width: 100%;
+        display: grid;
+        place-items: center;
+      }
+
+      #colorWord {
+        font-size: clamp(68px, 12vw, 200px);
+        line-height: 1;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        user-select: none;
+      }
+
+      #colorButtons {
+        width: min(960px, 100%);
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .color-btn {
+        min-height: 94px;
+        border: 4px solid #f5f5f0;
+        border-radius: 8px;
+        box-shadow: 8px 8px 0 #f5f5f0;
+        color: #f5f5f0;
+        font-family: "Arial Black", Arial, sans-serif;
+        font-size: 24px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      .color-btn:focus-visible {
+        outline: 3px dashed #f5f5f0;
+        outline-offset: 2px;
+      }
+
+      #feedback {
+        min-height: 24px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 16px;
+      }
+
+      #flashOverlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0;
+        z-index: 9;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="app">
+      <div class="hud">
+        <span id="scoreText">Score: 0</span>
+        <span id="timeText">Time: 45s</span>
+        <span id="streakText">Streak: 0</span>
+      </div>
+
+      <div id="flashOverlay"></div>
+
+      <div class="center">
+        <div id="message">WAITING FOR GAME TO START...</div>
+      </div>
+
+      <div class="center" id="instructionWrap">
+        <div class="panel">
+          <h2>Colour Reflex // Briefing</h2>
+          <p>Press the button matching the word meaning, not its text color.</p>
+          <p>Keyboard shortcuts: R / B / G / Y.</p>
+          <p id="difficultyText">Easy: no mismatch, 2.0s per word.</p>
+          <div class="difficulty-row">
+            <button class="difficulty-btn active" data-difficulty="easy">Easy</button>
+            <button class="difficulty-btn" data-difficulty="medium">Medium</button>
+            <button class="difficulty-btn" data-difficulty="hard">Hard</button>
+          </div>
+          <button class="start-btn" id="startBtn">Start Reflex</button>
+        </div>
+      </div>
+
+      <div id="gameWrap">
+        <div id="wordArea">
+          <div id="colorWord">RED</div>
+        </div>
+        <div id="feedback"></div>
+        <div id="colorButtons">
+          <button class="color-btn" data-color="RED" id="btnRed" style="background:#DC2626">RED (R)</button>
+          <button class="color-btn" data-color="BLUE" id="btnBlue" style="background:#2563EB">BLUE (B)</button>
+          <button class="color-btn" data-color="GREEN" id="btnGreen" style="background:#16A34A">GREEN (G)</button>
+          <button class="color-btn" data-color="YELLOW" id="btnYellow" style="background:#CA8A04">YELLOW (Y)</button>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      (function () {
+        const GAME_SECONDS = 45;
+        const COLORS = {
+          RED: "#DC2626",
+          BLUE: "#2563EB",
+          GREEN: "#16A34A",
+          YELLOW: "#CA8A04",
+        };
+        const DIFFICULTY = {
+          easy: { mismatchRate: 0, wordMs: 2000 },
+          medium: { mismatchRate: 0.4, wordMs: 1600 },
+          hard: { mismatchRate: 0.7, wordMs: 1200 },
+        };
+
+        const messageEl = document.getElementById("message");
+        const instructionWrapEl = document.getElementById("instructionWrap");
+        const difficultyTextEl = document.getElementById("difficultyText");
+        const difficultyButtons = document.querySelectorAll(".difficulty-btn");
+        const startBtnEl = document.getElementById("startBtn");
+        const gameWrapEl = document.getElementById("gameWrap");
+        const colorWordEl = document.getElementById("colorWord");
+        const feedbackEl = document.getElementById("feedback");
+        const scoreTextEl = document.getElementById("scoreText");
+        const timeTextEl = document.getElementById("timeText");
+        const streakTextEl = document.getElementById("streakText");
+        const flashOverlayEl = document.getElementById("flashOverlay");
+        const colorButtons = document.querySelectorAll(".color-btn");
+
+        let gameReady = false;
+        let started = false;
+        let difficulty = "easy";
+        let houseColor = "#16A34A";
+        let score = 0;
+        let correctHits = 0;
+        let wrongHits = 0;
+        let streak = 0;
+        let timeLeft = GAME_SECONDS;
+        let activeWord = "RED";
+        let answerLocked = false;
+        let roundDeadline = 0;
+        let gameTimerId = null;
+        let loopTimerId = null;
+        let feedbackTimerId = null;
+        let flashTimerId = null;
+
+        function updateDifficultyText() {
+          if (difficulty === "easy") {
+            difficultyTextEl.textContent = "Easy: no mismatch, 2.0s per word.";
+          } else if (difficulty === "medium") {
+            difficultyTextEl.textContent = "Medium: 40% mismatch, 1.6s per word.";
+          } else {
+            difficultyTextEl.textContent = "Hard: 70% mismatch, 1.2s per word.";
+          }
+        }
+
+        function updateHud() {
+          scoreTextEl.textContent = "Score: " + Math.max(0, score);
+          timeTextEl.textContent = "Time: " + Math.max(0, timeLeft) + "s";
+          streakTextEl.textContent = "Streak: " + streak;
+        }
+
+        function clearTimers() {
+          if (gameTimerId) {
+            clearInterval(gameTimerId);
+            gameTimerId = null;
+          }
+          if (loopTimerId) {
+            clearTimeout(loopTimerId);
+            loopTimerId = null;
+          }
+          if (feedbackTimerId) {
+            clearTimeout(feedbackTimerId);
+            feedbackTimerId = null;
+          }
+          if (flashTimerId) {
+            clearTimeout(flashTimerId);
+            flashTimerId = null;
+          }
+        }
+
+        function showFlash(color) {
+          flashOverlayEl.style.background = color;
+          flashOverlayEl.style.opacity = "0.36";
+          if (flashTimerId) clearTimeout(flashTimerId);
+          flashTimerId = window.setTimeout(function () {
+            flashOverlayEl.style.opacity = "0";
+          }, 200);
+        }
+
+        function showFeedback(text, color) {
+          feedbackEl.textContent = text;
+          feedbackEl.style.color = color;
+          if (feedbackTimerId) clearTimeout(feedbackTimerId);
+          feedbackTimerId = window.setTimeout(function () {
+            feedbackEl.textContent = "";
+          }, 240);
+        }
+
+        function pickRandomWord() {
+          const words = Object.keys(COLORS);
+          const idx = Math.floor(Math.random() * words.length);
+          return words[idx];
+        }
+
+        function pickDifferentColor(exceptWord) {
+          const entries = Object.keys(COLORS).filter(function (key) {
+            return key !== exceptWord;
+          });
+          return entries[Math.floor(Math.random() * entries.length)];
+        }
+
+        function showNextPrompt() {
+          if (!started) return;
+          const cfg = DIFFICULTY[difficulty];
+          activeWord = pickRandomWord();
+          const mismatch = Math.random() < cfg.mismatchRate;
+          const paintName = mismatch ? pickDifferentColor(activeWord) : activeWord;
+          colorWordEl.textContent = activeWord;
+          colorWordEl.style.color = COLORS[paintName];
+          answerLocked = false;
+          roundDeadline = performance.now() + cfg.wordMs;
+          if (loopTimerId) clearTimeout(loopTimerId);
+          loopTimerId = window.setTimeout(function () {
+            if (!started) return;
+            if (!answerLocked && performance.now() >= roundDeadline) {
+              streak = 0;
+              updateHud();
+              showFeedback("TOO SLOW", "#f5f5f0");
+            }
+            showNextPrompt();
+          }, cfg.wordMs);
+        }
+
+        function handleAnswer(selected) {
+          if (!started || answerLocked) return;
+          answerLocked = true;
+
+          if (selected === activeWord) {
+            correctHits += 1;
+            score += 2;
+            streak += 1;
+            if (streak > 0 && streak % 5 === 0) {
+              score += 3;
+              showFeedback("CORRECT +2 BONUS +3", houseColor);
+            } else {
+              showFeedback("CORRECT +2", houseColor);
+            }
+            showFlash(houseColor);
+          } else {
+            wrongHits += 1;
+            score -= 1;
+            streak = 0;
+            showFeedback("WRONG -1", "#ef4444");
+            showFlash("#ef4444");
+          }
+          updateHud();
+          showNextPrompt();
+        }
+
+        function finishGame() {
+          if (!started) return;
+          started = false;
+          clearTimers();
+          const finalScore = Math.max(0, correctHits - wrongHits);
+          feedbackEl.textContent = "RUN OVER - FINAL SCORE " + finalScore;
+          feedbackEl.style.color = "#f5f5f0";
+          colorWordEl.textContent = "TIME";
+          colorWordEl.style.color = "#f5f5f0";
+
+          window.parent.postMessage(
+            {
+              type: "HOUSEWARS_GAME_OVER",
+              payload: {
+                metric_type: "score",
+                metric_value: finalScore,
+              },
+            },
+            "*",
+          );
+        }
+
+        function startGame() {
+          if (!gameReady || started) return;
+          clearTimers();
+          started = true;
+          score = 0;
+          correctHits = 0;
+          wrongHits = 0;
+          streak = 0;
+          timeLeft = GAME_SECONDS;
+          feedbackEl.textContent = "";
+          instructionWrapEl.style.display = "none";
+          messageEl.textContent = "";
+          gameWrapEl.style.display = "flex";
+          updateHud();
+          showNextPrompt();
+
+          gameTimerId = window.setInterval(function () {
+            timeLeft -= 1;
+            updateHud();
+            if (timeLeft <= 0) {
+              finishGame();
+            }
+          }, 1000);
+        }
+
+        difficultyButtons.forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            const nextDifficulty = btn.getAttribute("data-difficulty");
+            if (!nextDifficulty) return;
+            difficulty = nextDifficulty;
+            difficultyButtons.forEach(function (node) {
+              node.classList.remove("active");
+            });
+            btn.classList.add("active");
+            updateDifficultyText();
+          });
+        });
+
+        colorButtons.forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            const colorName = btn.getAttribute("data-color");
+            if (!colorName) return;
+            handleAnswer(colorName);
+          });
+        });
+
+        window.addEventListener("keydown", function (event) {
+          const key = event.key.toLowerCase();
+          if (key === "r") handleAnswer("RED");
+          if (key === "b") handleAnswer("BLUE");
+          if (key === "g") handleAnswer("GREEN");
+          if (key === "y") handleAnswer("YELLOW");
+        });
+
+        startBtnEl.addEventListener("click", startGame);
+
+        window.addEventListener("message", function (event) {
+          if (!event.data || typeof event.data !== "object") return;
+          if (event.data.type !== "HOUSEWARS_GAME_START") return;
+          if (started) return;
+
+          const payload = event.data.payload || {};
+          if (typeof payload.house_color === "string" && payload.house_color.trim()) {
+            houseColor = payload.house_color.trim();
+          }
+
+          gameReady = true;
+          started = false;
+          clearTimers();
+          updateDifficultyText();
+          score = 0;
+          correctHits = 0;
+          wrongHits = 0;
+          streak = 0;
+          timeLeft = GAME_SECONDS;
+          updateHud();
+          gameWrapEl.style.display = "none";
+          instructionWrapEl.style.display = "grid";
+          messageEl.textContent = "Choose difficulty and start your run";
+        });
+      })();
+    </script>
+  </body>
+</html>

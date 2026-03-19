@@ -1,10 +1,19 @@
 import { redirect } from "next/navigation";
 import { ChallengesPageClient } from "@/components/challenges-page-client";
+import { slugify } from "@/lib/slug";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type ProfileRow = {
   id: string;
   challenge_tokens: number | null;
+  house:
+    | {
+        hex_code: string | null;
+      }[]
+    | {
+        hex_code: string | null;
+      }
+    | null;
 };
 
 type ActiveChallengeRow = {
@@ -48,6 +57,8 @@ type ChallengeEntryRow = {
   challenge_id: string;
   user_id: string;
   rank: number | null;
+  best_score: number | null;
+  attempts: number | null;
 };
 
 export default async function ChallengesPage() {
@@ -63,7 +74,11 @@ export default async function ChallengesPage() {
   const nowIso = new Date().toISOString();
   const [{ data: profile }, { data: activeChallenges }, { data: pastChallenges }, { data: games }] =
     await Promise.all([
-      supabase.from("profiles").select("id,challenge_tokens").eq("id", user.id).maybeSingle<ProfileRow>(),
+      supabase
+        .from("profiles")
+        .select("id,challenge_tokens,house:houses(hex_code)")
+        .eq("id", user.id)
+        .maybeSingle<ProfileRow>(),
       supabase
         .from("challenges")
         .select("id,title,game_id,gp_reward,ct_entry_cost,min_participants,ends_at,status,game:games(name)")
@@ -93,7 +108,7 @@ export default async function ChallengesPage() {
     allChallengeIds.length > 0
       ? await supabase
           .from("challenge_entries")
-          .select("challenge_id,user_id,rank")
+          .select("challenge_id,user_id,rank,best_score,attempts")
           .in("challenge_id", allChallengeIds)
       : { data: [] };
 
@@ -133,17 +148,29 @@ export default async function ChallengesPage() {
     const game = Array.isArray(row.game) ? row.game[0] : row.game;
     const challengeEntries = entriesByChallenge.get(row.id) ?? [];
     const userEntry = challengeEntries.find((entry) => entry.user_id === user.id);
+    const rankedEntries = [...challengeEntries].sort(
+      (a, b) => Number(b.best_score ?? 0) - Number(a.best_score ?? 0),
+    );
+    const joinedRank = userEntry
+      ? rankedEntries.findIndex((entry) => entry.user_id === user.id) + 1
+      : null;
+    const attempts = Number(userEntry?.attempts ?? 0);
+    const bestScore = Number(userEntry?.best_score ?? 0);
+
     return {
       id: row.id,
       title: row.title,
       gameName: (game?.name ?? "GAME").toUpperCase(),
+      gameSlug: slugify(game?.name ?? "game"),
       gpReward: Number(row.gp_reward ?? 0),
       ctEntryCost: Number(row.ct_entry_cost ?? 0),
       participants: challengeEntries.length,
       minParticipants: Number(row.min_participants ?? 0),
       endsAt: row.ends_at,
       alreadyJoined: Boolean(userEntry),
-      joinedRank: userEntry?.rank ?? null,
+      joinedRank,
+      joinedBestScore: bestScore,
+      joinedAttempts: attempts,
     };
   });
 
@@ -170,12 +197,14 @@ export default async function ChallengesPage() {
     const game = row as { id?: string; name?: string | null };
     return { id: String(game.id ?? ""), name: String(game.name ?? "Game") };
   });
+  const profileHouse = Array.isArray(profile.house) ? profile.house[0] : profile.house;
 
   return (
     <section className="min-h-screen bg-[#111111] px-4 py-10 text-white md:px-10 lg:px-16">
       <div className="mx-auto max-w-[1440px] space-y-8">
         <ChallengesPageClient
           challengeTokens={Number(profile.challenge_tokens ?? 0)}
+          houseAccentColor={profileHouse?.hex_code ?? "#DC2626"}
           activeChallenges={activeData}
           pastChallenges={pastData}
           gameOptions={gameOptions}

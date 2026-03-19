@@ -17,6 +17,14 @@ type DbGame = {
 };
 
 const TEST_GAME_EMBED_URL = "https://html5.gamedistribution.com/305d2a5605784aaf8587ffefc765e5cf/";
+const GAME_THUMBNAIL_V1: Record<string, string> = {
+  "Speed Tap": "/thumbnails/Speed%20Tap%201.png",
+  "Word Scramble": "/thumbnails/Word%20Scramble%201.jpeg",
+  "Memory Grid": "/thumbnails/Memory%20Grid%201.jpeg",
+  "Math Blitz": "/thumbnails/Math%20Blitz%201.jpeg",
+  "Colour Reflex": "/thumbnails/Colour%20Reflex%201.png",
+  "Tile Flood": "/thumbnails/Tile%20Flood%201.jpeg",
+};
 
 export default async function GamesLobbyPage() {
   const supabase = await createSupabaseServerClient();
@@ -89,40 +97,49 @@ export default async function GamesLobbyPage() {
             </p>
           </article>
         ) : (
-          games.map((game) => (
-            <article
-              key={game.id}
-              className="overflow-hidden border-[3px] border-[#0D0D0D] bg-[#F5F5F0]"
-            >
-              <div className="h-40 w-full bg-[#1A1A1A]">
-                {game.thumbnail_url ? (
-                  <img
-                    src={game.thumbnail_url}
-                    alt={`${game.name} thumbnail`}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                  />
-                ) : null}
-              </div>
-              <div className="space-y-2 p-4">
-                <h2 className={`${oswald.className} text-3xl uppercase leading-none`}>{game.name}</h2>
-                <span
-                  className={`${jetMono.className} inline-block px-2.5 py-1 text-[11px] font-semibold`}
-                  style={{ background: game.is_scored ? "#FF6B35" : "#00D4AA" }}
-                >
-                  {game.is_scored ? "SCORED" : "TIMED"}
-                </span>
-              </div>
-              <div className="bg-[#0D0D0D] px-3 py-3 text-center">
-                <Link
-                  href={`/games/${slugify(game.name)}`}
-                  className={`${jetMono.className} inline-block text-xs font-semibold tracking-[0.04em] text-white`}
-                >
-                  PLAY NOW
-                </Link>
-              </div>
-            </article>
-          ))
+          games.map((game) => {
+            const thumbnailSrc = GAME_THUMBNAIL_V1[game.name] ?? game.thumbnail_url;
+
+            return (
+              <article
+                key={game.id}
+                className="group relative overflow-hidden border-[3px] border-[#0D0D0D] bg-[#F5F5F0] transition-all duration-200 hover:-translate-y-1 hover:shadow-[8px_8px_0_#0D0D0D]"
+              >
+                <div className="relative h-40 w-full overflow-hidden bg-[#1A1A1A]">
+                  {thumbnailSrc ? (
+                    <img
+                      src={thumbnailSrc}
+                      alt={`${game.name} thumbnail`}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                      loading="lazy"
+                    />
+                  ) : null}
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-black/15 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                </div>
+                <div className="space-y-2 p-4">
+                  <h2
+                    className={`${oswald.className} text-3xl uppercase leading-none transition-transform duration-200 group-hover:translate-x-1`}
+                  >
+                    {game.name}
+                  </h2>
+                  <span
+                    className={`${jetMono.className} inline-block px-2.5 py-1 text-[11px] font-semibold transition-transform duration-200 group-hover:-translate-y-0.5`}
+                    style={{ background: game.is_scored ? "#FF6B35" : "#00D4AA" }}
+                  >
+                    {game.is_scored ? "SCORED" : "TIMED"}
+                  </span>
+                </div>
+                <div className="bg-[#0D0D0D] px-3 py-3 text-center">
+                  <Link
+                    href={`/games/${slugify(game.name)}`}
+                    className={`${jetMono.className} inline-block text-xs font-semibold tracking-[0.04em] text-white transition-all duration-200 group-hover:translate-x-1 group-hover:underline`}
+                  >
+                    PLAY NOW →
+                  </Link>
+                </div>
+              </article>
+            );
+          })
         )}
         </div>
       </div>

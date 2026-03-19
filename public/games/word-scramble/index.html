@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Word Scramble</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        font-family: "Arial Black", Arial, sans-serif;
+        background: #f5f5f0;
+        color: #111111;
+      }
+
+      #app {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        border: 4px solid #111111;
+        background: linear-gradient(180deg, #f5f5f0 0%, #f5f5f0 70%, #efeadd 100%);
+      }
+
+      .hud {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        background: #111111;
+        border: 3px solid #111111;
+        z-index: 10;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        color: #f5f5f0;
+        text-transform: uppercase;
+      }
+
+      .center {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        padding: 24px;
+        z-index: 3;
+      }
+
+      #message {
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+      }
+
+      .panel {
+        width: min(680px, 92%);
+        background: #f5f5f0;
+        border: 4px solid #111111;
+        box-shadow: 10px 10px 0 #111111;
+        padding: 16px;
+        text-transform: uppercase;
+      }
+
+      .panel h2 {
+        margin: 0 0 8px;
+        font-size: 24px;
+        letter-spacing: 0.03em;
+      }
+
+      .panel p {
+        margin: 0 0 10px;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .difficulty-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin: 10px 0 14px;
+      }
+
+      .difficulty-btn {
+        padding: 10px 8px;
+        border: 3px solid #111111;
+        background: #ffffff;
+        box-shadow: 8px 8px 0 #111111;
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      .difficulty-btn.active {
+        background: #111111;
+        color: #f5f5f0;
+      }
+
+      .start-btn {
+        width: 100%;
+        padding: 12px;
+        border: 3px solid #111111;
+        background: #ffd700;
+        box-shadow: 8px 8px 0 #111111;
+        font-size: 14px;
+        font-weight: 900;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      #instructionWrap {
+        display: none;
+        z-index: 12;
+      }
+
+      #gameWrap {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding-top: 72px;
+      }
+
+      .game-stack {
+        width: min(860px, 94%);
+        text-align: center;
+        display: grid;
+        gap: 18px;
+      }
+
+      #scrambleWord {
+        font-size: clamp(64px, 11vw, 160px);
+        line-height: 1;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      #answerForm {
+        display: grid;
+        gap: 12px;
+        justify-items: center;
+      }
+
+      #answerInput {
+        width: min(480px, 96%);
+        padding: 14px 16px;
+        border: 4px solid #111111;
+        box-shadow: 8px 8px 0 #111111;
+        background: #ffffff;
+        color: #111111;
+        text-transform: uppercase;
+        font-family: "Arial Black", Arial, sans-serif;
+        font-size: 24px;
+        text-align: center;
+        outline: none;
+      }
+
+      #answerInput:focus {
+        background: #fffdf5;
+      }
+
+      #feedback {
+        min-height: 26px;
+        font-size: 22px;
+        letter-spacing: 0.04em;
+      }
+
+      .shake {
+        animation: shake 0.25s linear;
+      }
+
+      @keyframes shake {
+        0% {
+          transform: translateX(0);
+        }
+        25% {
+          transform: translateX(-8px);
+        }
+        50% {
+          transform: translateX(8px);
+        }
+        75% {
+          transform: translateX(-6px);
+        }
+        100% {
+          transform: translateX(0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main id="app">
+      <div class="hud">
+        <span id="scoreText">Round Score: 0</span>
+        <span id="timeText">Time Left: 60s</span>
+        <span id="playerText">Player: -</span>
+      </div>
+
+      <div class="center">
+        <div id="message">WAITING FOR GAME TO START...</div>
+      </div>
+
+      <div class="center" id="instructionWrap">
+        <div class="panel">
+          <h2>Word Scramble // Briefing</h2>
+          <p>Unscramble each word and score points equal to word length.</p>
+          <p id="difficultyText">Easy: 4-5 letter words, 60 seconds.</p>
+          <div class="difficulty-row">
+            <button class="difficulty-btn active" data-difficulty="easy">Easy</button>
+            <button class="difficulty-btn" data-difficulty="medium">Medium</button>
+            <button class="difficulty-btn" data-difficulty="hard">Hard</button>
+          </div>
+          <button class="start-btn" id="startBtn">Start Round</button>
+        </div>
+      </div>
+
+      <div id="gameWrap">
+        <div class="game-stack">
+          <div id="scrambleWord">----</div>
+          <form id="answerForm" autocomplete="off">
+            <input
+              id="answerInput"
+              type="text"
+              inputmode="text"
+              autocapitalize="characters"
+              spellcheck="false"
+              maxlength="12"
+              aria-label="Type unscrambled word"
+              placeholder="TYPE ANSWER"
+            />
+            <div id="feedback"></div>
+          </form>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      (function () {
+        const DIFFICULTIES = {
+          easy: { seconds: 60, words: ["PLANT", "HOUSE", "CHAIR", "TABLE", "PHONE", "WATER", "LIGHT", "BREAD", "CLOCK", "MUSIC", "FLAME", "STORM", "BRAVE", "TRACK"] },
+          medium: { seconds: 50, words: ["BRIDGE", "CASTLE", "DRAGON", "FROZEN", "GARDEN", "HUNTER", "ISLAND", "JUNGLE", "KNIGHT", "LAUNCH", "MIRROR", "PLANET"] },
+          hard: { seconds: 40, words: ["BLOSSOM", "CAPTAIN", "CHAPTER", "CONQUER", "DESTINY", "DYNASTY", "ELEVATE", "FREEDOM", "GRAVITY", "HORIZON", "KINGDOM", "MISSION"] },
+        };
+
+        const messageEl = document.getElementById("message");
+        const instructionWrapEl = document.getElementById("instructionWrap");
+        const difficultyTextEl = document.getElementById("difficultyText");
+        const difficultyButtons = document.querySelectorAll(".difficulty-btn");
+        const startBtnEl = document.getElementById("startBtn");
+        const gameWrapEl = document.getElementById("gameWrap");
+        const scrambleWordEl = document.getElementById("scrambleWord");
+        const answerFormEl = document.getElementById("answerForm");
+        const answerInputEl = document.getElementById("answerInput");
+        const feedbackEl = document.getElementById("feedback");
+        const scoreTextEl = document.getElementById("scoreText");
+        const timeTextEl = document.getElementById("timeText");
+        const playerTextEl = document.getElementById("playerText");
+
+        let gameReady = false;
+        let started = false;
+        let difficulty = "easy";
+        let houseColor = "#22c55e";
+        let playerName = "-";
+        let score = 0;
+        let secondsRemaining = DIFFICULTIES.easy.seconds;
+        let currentWord = "";
+        let timerId = null;
+        let feedbackTimerId = null;
+        let shuffledPool = [];
+
+        function updateHud() {
+          scoreTextEl.textContent = "Round Score: " + score;
+          timeTextEl.textContent = "Time Left: " + Math.max(0, secondsRemaining) + "s";
+          playerTextEl.textContent = "Player: " + playerName;
+        }
+
+        function updateDifficultyText() {
+          if (difficulty === "easy") {
+            difficultyTextEl.textContent = "Easy: 4-5 letter words, 60 seconds.";
+          } else if (difficulty === "medium") {
+            difficultyTextEl.textContent = "Medium: 5-7 letter words, 50 seconds.";
+          } else {
+            difficultyTextEl.textContent = "Hard: 7-9 letter words, 40 seconds.";
+          }
+        }
+
+        function randomizeWords(source) {
+          const arr = source.slice();
+          for (let i = arr.length - 1; i > 0; i -= 1) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const temp = arr[i];
+            arr[i] = arr[j];
+            arr[j] = temp;
+          }
+          return arr;
+        }
+
+        function nextWordFromPool() {
+          if (shuffledPool.length === 0) {
+            shuffledPool = randomizeWords(DIFFICULTIES[difficulty].words);
+          }
+          return shuffledPool.pop() || "";
+        }
+
+        function scrambleWord(word) {
+          if (!word) return "----";
+          if (word.length <= 1) return word;
+          const chars = word.split("");
+          let scrambled = word;
+          for (let attempt = 0; attempt < 8 && scrambled === word; attempt += 1) {
+            for (let i = chars.length - 1; i > 0; i -= 1) {
+              const j = Math.floor(Math.random() * (i + 1));
+              const temp = chars[i];
+              chars[i] = chars[j];
+              chars[j] = temp;
+            }
+            scrambled = chars.join("");
+          }
+          return scrambled === word ? word.split("").reverse().join("") : scrambled;
+        }
+
+        function showFeedback(text, color) {
+          feedbackEl.textContent = text;
+          feedbackEl.style.color = color;
+          if (feedbackTimerId) {
+            clearTimeout(feedbackTimerId);
+          }
+          feedbackTimerId = window.setTimeout(function () {
+            feedbackEl.textContent = "";
+          }, 450);
+        }
+
+        function loadNextWord() {
+          currentWord = nextWordFromPool();
+          scrambleWordEl.textContent = scrambleWord(currentWord);
+          answerInputEl.value = "";
+          answerInputEl.focus();
+        }
+
+        function clearTimers() {
+          if (timerId) {
+            clearInterval(timerId);
+            timerId = null;
+          }
+          if (feedbackTimerId) {
+            clearTimeout(feedbackTimerId);
+            feedbackTimerId = null;
+          }
+        }
+
+        function sendGameOver(finalScore) {
+          window.parent.postMessage(
+            {
+              type: "HOUSEWARS_GAME_OVER",
+              payload: {
+                metric_type: "score",
+                metric_value: finalScore,
+              },
+            },
+            "*",
+          );
+        }
+
+        function finishGame() {
+          if (!started) return;
+          started = false;
+          clearTimers();
+          answerInputEl.blur();
+          answerInputEl.disabled = true;
+          scrambleWordEl.textContent = "TIME";
+          feedbackEl.style.color = "#111111";
+          feedbackEl.textContent = "FINAL SCORE: " + score;
+          updateHud();
+          window.setTimeout(function () {
+            sendGameOver(score);
+          }, 2000);
+        }
+
+        function startGameRound() {
+          if (!gameReady || started) return;
+          started = true;
+          score = 0;
+          secondsRemaining = DIFFICULTIES[difficulty].seconds;
+          shuffledPool = randomizeWords(DIFFICULTIES[difficulty].words);
+          instructionWrapEl.style.display = "none";
+          messageEl.textContent = "";
+          gameWrapEl.style.display = "flex";
+          answerInputEl.disabled = false;
+          feedbackEl.textContent = "";
+          updateHud();
+          loadNextWord();
+
+          timerId = window.setInterval(function () {
+            secondsRemaining -= 1;
+            updateHud();
+            if (secondsRemaining <= 0) {
+              finishGame();
+            }
+          }, 1000);
+        }
+
+        difficultyButtons.forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            const selected = btn.getAttribute("data-difficulty");
+            if (!selected) return;
+            difficulty = selected;
+            difficultyButtons.forEach(function (node) {
+              node.classList.remove("active");
+            });
+            btn.classList.add("active");
+            updateDifficultyText();
+            if (!started) {
+              secondsRemaining = DIFFICULTIES[difficulty].seconds;
+              updateHud();
+            }
+          });
+        });
+
+        startBtnEl.addEventListener("click", startGameRound);
+
+        answerInputEl.addEventListener("input", function () {
+          answerInputEl.value = answerInputEl.value.toUpperCase();
+        });
+
+        answerFormEl.addEventListener("submit", function (event) {
+          event.preventDefault();
+          if (!started) return;
+          const answer = answerInputEl.value.trim().toUpperCase();
+          if (!answer) return;
+
+          if (answer === currentWord) {
+            const gained = currentWord.length;
+            score += gained;
+            updateHud();
+            showFeedback("CORRECT +" + gained + "PTS", houseColor);
+            loadNextWord();
+          } else {
+            answerInputEl.classList.remove("shake");
+            void answerInputEl.offsetWidth;
+            answerInputEl.classList.add("shake");
+          }
+        });
+
+        window.addEventListener("message", function (event) {
+          if (!event.data || typeof event.data !== "object") return;
+          if (event.data.type !== "HOUSEWARS_GAME_START") return;
+          if (started) return;
+
+          const payload = event.data.payload || {};
+          if (typeof payload.house_color === "string" && payload.house_color.trim()) {
+            houseColor = payload.house_color;
+          }
+          if (typeof payload.player_name === "string" && payload.player_name.trim()) {
+            playerName = payload.player_name.trim();
+          } else {
+            playerName = "PLAYER";
+          }
+
+          gameReady = true;
+          score = 0;
+          secondsRemaining = DIFFICULTIES[difficulty].seconds;
+          currentWord = "";
+          clearTimers();
+          updateDifficultyText();
+          updateHud();
+          gameWrapEl.style.display = "none";
+          instructionWrapEl.style.display = "grid";
+          messageEl.textContent = "Choose difficulty and start your round";
+        });
+      })();
+    </script>
+  </body>
+</html>

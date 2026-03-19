@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { inter, jetMono } from "@/lib/fonts";
 
@@ -8,6 +9,7 @@ type ActiveChallenge = {
   id: string;
   title: string;
   gameName: string;
+  gameSlug: string;
   gpReward: number;
   ctEntryCost: number;
   participants: number;
@@ -15,6 +17,8 @@ type ActiveChallenge = {
   endsAt: string;
   alreadyJoined: boolean;
   joinedRank: number | null;
+  joinedBestScore: number;
+  joinedAttempts: number;
 };
 
 type PastChallenge = {
@@ -36,13 +40,13 @@ type GameOption = {
 
 type Props = {
   challengeTokens: number;
+  houseAccentColor: string;
   activeChallenges: ActiveChallenge[];
   pastChallenges: PastChallenge[];
   gameOptions: GameOption[];
 };
 
-function formatCountdown(endsAt: string): string {
-  const diffMs = new Date(endsAt).getTime() - Date.now();
+function formatCountdownFromDiff(diffMs: number): string {
   if (diffMs <= 0) return "ENDED";
   const totalSeconds = Math.floor(diffMs / 1000);
   const hours = Math.floor(totalSeconds / 3600);
@@ -51,14 +55,33 @@ function formatCountdown(endsAt: string): string {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+function ChallengeCountdown({ endsAt }: { endsAt: string }) {
+  const [timeLeft, setTimeLeft] = useState<string>("");
+
+  useEffect(() => {
+    const update = () => {
+      const diffMs = new Date(endsAt).getTime() - Date.now();
+      setTimeLeft(formatCountdownFromDiff(diffMs));
+    };
+
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [endsAt]);
+
+  return <span>{timeLeft || "--:--:--"}</span>;
+}
+
 export function ChallengesPageClient({
   challengeTokens,
+  houseAccentColor,
   activeChallenges,
   pastChallenges,
   gameOptions,
 }: Props) {
   const router = useRouter();
-  const [nowTick, setNowTick] = useState(Date.now());
+  const [localCtBalance, setLocalCtBalance] = useState(challengeTokens);
+  const [localActiveChallenges, setLocalActiveChallenges] = useState(activeChallenges);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isJoiningId, setIsJoiningId] = useState<string | null>(null);
@@ -70,9 +93,9 @@ export function ChallengesPageClient({
   const [durationHours, setDurationHours] = useState(24);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNowTick(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
+    setLocalCtBalance(challengeTokens);
+    setLocalActiveChallenges(activeChallenges);
+  }, [activeChallenges, challengeTokens]);
 
   const onJoin = async (challengeId: string) => {
     setIsJoiningId(challengeId);
@@ -87,7 +110,21 @@ export function ChallengesPageClient({
         const payload = (await response.json().catch(() => ({}))) as { error?: string };
         throw new Error(payload.error ?? "Could not join challenge");
       }
-      router.refresh();
+      const joinedChallenge = localActiveChallenges.find((item) => item.id === challengeId);
+      setLocalCtBalance((value) => Math.max(0, value - Number(joinedChallenge?.ctEntryCost ?? 0)));
+      setLocalActiveChallenges((current) =>
+        current.map((challenge) => {
+          if (challenge.id !== challengeId) return challenge;
+          return {
+            ...challenge,
+            alreadyJoined: true,
+            joinedAttempts: 0,
+            joinedBestScore: 0,
+            joinedRank: null,
+            participants: challenge.participants + 1,
+          };
+        }),
+      );
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Could not join challenge");
     } finally {
@@ -133,16 +170,16 @@ export function ChallengesPageClient({
         <div className="h-1 flex-1 bg-white" />
         <div className="border-[3px] border-[#00D4AA] bg-[#0D0D0D] px-4 py-2">
           <p className={`${jetMono.className} text-xs font-semibold tracking-[0.08em] text-[#00D4AA]`}>
-            YOUR TOKENS: {challengeTokens} CT
+            YOUR TOKENS: {localCtBalance} CT
           </p>
         </div>
       </header>
 
       <div className="grid gap-8 lg:grid-cols-2">
-        {activeChallenges.map((challenge) => {
-          const ended = new Date(challenge.endsAt).getTime() <= nowTick;
-          const insufficientCt = challengeTokens < challenge.ctEntryCost;
-          const joinDisabled = ended || insufficientCt || challenge.alreadyJoined;
+        {localActiveChallenges.map((challenge) => {
+          const insufficientCt = localCtBalance < challenge.ctEntryCost;
+          const joinDisabled = insufficientCt || challenge.alreadyJoined;
+          const hasPlayed = challenge.joinedAttempts > 0;
           return (
             <article key={challenge.id} className="border-[4px] border-black bg-[#1A1A1A]">
               <div className="border-b-[3px] border-black px-5 py-4">
@@ -170,16 +207,12 @@ export function ChallengesPageClient({
                 </div>
                 <div className="border-2 border-[#999999] bg-black px-4 py-2">
                   <p className={`${jetMono.className} text-3xl font-bold tracking-[0.16em] text-[#DC2626]`}>
-                    {formatCountdown(challenge.endsAt)}
+                    <ChallengeCountdown endsAt={challenge.endsAt} />
                   </p>
                 </div>
               </div>
               <div className="border-t-[3px] border-black p-4">
-                {challenge.alreadyJoined ? (
-                  <p className={`${jetMono.className} text-sm font-bold text-[#00D4AA]`}>
-                    YOUR CURRENT RANK: {challenge.joinedRank ? `#${challenge.joinedRank}` : "--"}
-                  </p>
-                ) : (
+                {!challenge.alreadyJoined ? (
                   <button
                     type="button"
                     onClick={() => void onJoin(challenge.id)}
@@ -190,8 +223,36 @@ export function ChallengesPageClient({
                         : "bg-black text-white hover:bg-white hover:text-black"
                     }`}
                   >
-                    {ended ? "CHALLENGE ENDED" : insufficientCt ? "INSUFFICIENT CT" : "JOIN"}
+                    {insufficientCt ? "INSUFFICIENT CT" : "JOIN"}
                   </button>
+                ) : !hasPlayed ? (
+                  <div className="space-y-3">
+                    <p className={`${jetMono.className} text-sm font-bold text-[#00D4AA]`}>
+                      You&apos;re in - play the game to submit your score
+                    </p>
+                    <Link
+                      href={`/games/${challenge.gameSlug}?challenge_id=${challenge.id}`}
+                      className={`${inter.className} block w-full border-[3px] py-3 text-center text-sm font-black tracking-[0.12em] uppercase text-black`}
+                      style={{ background: houseAccentColor, borderColor: houseAccentColor }}
+                    >
+                      PLAY NOW →
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className={`${jetMono.className} text-sm font-bold text-[#00D4AA]`}>
+                      YOUR RANK: #{challenge.joinedRank ?? "--"} of {challenge.participants} players
+                    </p>
+                    <p className={`${jetMono.className} text-sm font-bold text-[#FFD700]`}>
+                      BEST SCORE: {challenge.joinedBestScore}
+                    </p>
+                    <Link
+                      href={`/games/${challenge.gameSlug}?challenge_id=${challenge.id}`}
+                      className={`${inter.className} block w-full border-[3px] border-white py-3 text-center text-sm font-black tracking-[0.12em] uppercase text-white hover:bg-white hover:text-black`}
+                    >
+                      PLAY AGAIN
+                    </Link>
+                  </div>
                 )}
               </div>
             </article>
@@ -209,46 +270,46 @@ export function ChallengesPageClient({
 
       <div className="space-y-4">
         <h2 className={`${inter.className} text-2xl font-black uppercase tracking-[0.08em]`}>
-          Past Challenges
+          Ended Challenges
         </h2>
-        <div className="overflow-x-auto border-[3px] border-black">
-          <table className="w-full min-w-[980px] border-collapse">
-            <thead className={`${inter.className} bg-white text-[12px] font-extrabold text-black`}>
-              <tr>
-                <th className="px-5 py-3 text-left">TITLE</th>
-                <th className="px-5 py-3 text-left">GAME</th>
-                <th className="px-5 py-3 text-left">GP REWARD</th>
-                <th className="px-5 py-3 text-left">WINNER</th>
-                <th className="px-5 py-3 text-left">PARTICIPANTS</th>
-                <th className="px-5 py-3 text-left">DATE</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pastChallenges.map((row, idx) => (
-                <tr
-                  key={row.id}
-                  className="h-11 border-t border-[#333333]"
-                  style={{ background: idx % 2 === 0 ? "#222222" : "#1A1A1A" }}
-                >
-                  <td className={`${inter.className} px-5 text-sm font-semibold text-white`}>{row.title}</td>
-                  <td className={`${inter.className} px-5 text-sm font-semibold text-[#999999]`}>{row.gameName}</td>
-                  <td className={`${jetMono.className} px-5 text-sm font-semibold text-[#CA8A04]`}>
-                    {row.gpReward}
-                  </td>
-                  <td
-                    className={`${inter.className} px-5 text-sm font-bold`}
-                    style={{ color: row.winnerColor ?? "#999999" }}
-                  >
-                    {row.status === "cancelled"
-                      ? "CANCELLED - CT REFUNDED"
-                      : (row.winnerName ?? "PENDING")}
-                  </td>
-                  <td className={`${jetMono.className} px-5 text-sm text-[#999999]`}>{row.participants}</td>
-                  <td className={`${jetMono.className} px-5 text-sm text-[#999999]`}>{row.date}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="grid gap-6 md:grid-cols-2">
+          {pastChallenges.map((row) => (
+            <article key={row.id} className="border-[4px] border-black bg-[#1A1A1A]">
+              <div className="border-b-[3px] border-black px-5 py-4">
+                <p className={`${inter.className} text-lg font-extrabold uppercase`}>{row.gameName}</p>
+              </div>
+              <div className="space-y-3 px-6 py-5">
+                <p className={`${inter.className} text-sm font-semibold uppercase text-[#999999]`}>
+                  {row.title}
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className={`${jetMono.className} text-sm font-bold text-[#FFD700]`}>
+                    GP REWARD: {row.gpReward}
+                  </span>
+                  <span className={`${jetMono.className} text-xs font-semibold text-[#999999]`}>
+                    PARTICIPANTS: {row.participants}
+                  </span>
+                </div>
+                {row.status === "cancelled" ? (
+                  <p className={`${jetMono.className} text-sm font-bold text-[#F59E0B]`}>
+                    CANCELLED - CT REFUNDED
+                  </p>
+                ) : (
+                  <p className={`${jetMono.className} text-sm font-bold`} style={{ color: row.winnerColor ?? "#999999" }}>
+                    WINNER: {row.winnerName ?? "PENDING"}
+                  </p>
+                )}
+                <p className={`${jetMono.className} text-xs font-semibold text-[#999999]`}>
+                  ENDED: {row.date}
+                </p>
+              </div>
+              <div className="border-t-[3px] border-black p-4">
+                <p className={`${jetMono.className} text-xs font-semibold text-[#777777]`}>
+                  NO ACTIONS AVAILABLE
+                </p>
+              </div>
+            </article>
+          ))}
         </div>
       </div>
 
