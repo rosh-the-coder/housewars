@@ -155,11 +155,12 @@ export function GameEmbed({
       const payload = (await response.json()) as SessionEndPayload;
       let challengeStats: ChallengeSubmitPayload | null = null;
       if (challengeContext?.id) {
+        const challengeScore = Math.max(0, Math.round(Number(payload.gp_earned ?? 0)));
         const submitResponse = await fetch(`/api/challenges/${challengeContext.id}/submit`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ score: Math.max(0, Math.round(metricValue)) }),
+          body: JSON.stringify({ score: challengeScore }),
         });
         if (submitResponse.ok) {
           challengeStats = (await submitResponse.json()) as ChallengeSubmitPayload;
@@ -174,7 +175,7 @@ export function GameEmbed({
       setResult({
         rank: payload.rank ?? "-",
         totalPlayers: Number(payload.total_players ?? 0),
-        placementPoints: Math.max(0, Math.round(metricValue)),
+        placementPoints: Math.max(0, Math.round(Number(payload.gp_earned ?? 0))),
         difficultyMultiplier: Number(payload.multiplier ?? 1),
         gpEarned: Number(payload.gp_earned ?? 0),
         ctEarned: Number(payload.ct_earned ?? 0),

@@ -356,12 +356,13 @@ export function ChallengesPageClient({
                   />
                 </label>
                 <label className={`${jetMono.className} block text-xs font-semibold text-[#999999]`}>
-                  GP REWARD
+                  GP REWARD (MAX {ctEntryCost * 10})
                   <input
                     type="number"
                     min={25}
+                    max={ctEntryCost * 10}
                     value={gpReward}
-                    onChange={(e) => setGpReward(Math.max(25, Number(e.target.value || 25)))}
+                    onChange={(e) => setGpReward(Math.min(ctEntryCost * 10, Math.max(25, Number(e.target.value || 25))))}
                     className="mt-1 w-full border-[3px] border-black bg-[#111111] px-3 py-2 text-white"
                   />
                 </label>
@@ -389,6 +390,9 @@ export function ChallengesPageClient({
 
               <p className={`${jetMono.className} text-xs font-semibold text-[#00D4AA]`}>
                 You will spend {ctEntryCost} CT to create this
+              </p>
+              <p className={`${jetMono.className} text-[10px] font-semibold text-[#777777]`}>
+                GP REWARD CAPPED AT {ctEntryCost * 10} (10× ENTRY COST)
               </p>
             </div>
 

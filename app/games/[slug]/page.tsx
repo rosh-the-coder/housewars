@@ -24,6 +24,7 @@ type DbGame = {
   embed_url: string;
   thumbnail_url: string | null;
   ct_reward: number | null;
+  pts_per_minute: number | null;
   difficulty_multiplier: number | null;
   is_scored: boolean;
   is_active: boolean;
@@ -98,7 +99,7 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
 
   const { data } = await supabase
     .from("games")
-    .select("id,name,type,difficulty,embed_url,thumbnail_url,ct_reward,difficulty_multiplier,is_scored,is_active")
+    .select("id,name,type,difficulty,embed_url,thumbnail_url,ct_reward,pts_per_minute,difficulty_multiplier,is_scored,is_active")
     .eq("is_active", true);
   const games = (data ?? []) as DbGame[];
   const game = games.find((item) => slugify(item.name) === slug);
@@ -137,55 +138,23 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
   const userBestScore = sessions
     .filter((row) => row.user_id === user.id)
     .reduce(
-      (max, row) =>
-        Math.max(
-          max,
-          Number(isSpeedTap ? row.ct_earned ?? row.gp_earned ?? 0 : row.raw_score ?? 0),
-        ),
+      (max, row) => Math.max(max, Number(row.gp_earned ?? 0)),
       0,
     );
 
-  const userIds = Array.from(new Set(sessions.map((row) => row.user_id)));
-  const profilesById = new Map<string, ProfileRow>();
+  const { data: houseRows } = await supabase
+    .from("houses")
+    .select("id,name,hex_code,gp_alltime")
+    .order("gp_alltime", { ascending: false })
+    .limit(4);
 
-  if (userIds.length > 0) {
-    const profileRows = await supabase
-      .from("profiles")
-      .select("id,username,house_id,house:houses(name,hex_code)")
-      .in("id", userIds);
-    for (const row of (profileRows.data ?? []) as ProfileRow[]) {
-      profilesById.set(row.id, row);
-    }
-  }
-
-  const houseTotals = new Map<string, { houseName: string; color: string; gp_alltime: number }>();
-  for (const row of sessions) {
-    const profile = profilesById.get(row.user_id);
-    const house = Array.isArray(profile?.house) ? profile?.house[0] : profile?.house;
-    const houseName = normalizeHouseName(house?.name);
-    const key = houseName;
-    const current = houseTotals.get(key) ?? {
-      houseName,
-      color: getHouseColor(house?.name, house?.hex_code),
-      gp_alltime: 0,
-    };
-    current.gp_alltime += Number(row.gp_earned ?? 0);
-    houseTotals.set(key, current);
-  }
-
-  const leaderboard = Array.from(houseTotals.values())
-    .sort((a, b) => b.gp_alltime - a.gp_alltime)
+  const leaderboard = ((houseRows ?? []) as { id: string; name: string; hex_code: string | null; gp_alltime: number | null }[])
+    .map((h) => ({
+      houseName: normalizeHouseName(h.name),
+      color: h.hex_code ?? getHouseColor(h.name, null),
+      gp_alltime: Number(h.gp_alltime ?? 0),
+    }))
     .slice(0, 3);
-
-  while (leaderboard.length < 3) {
-    const fallbackOrder = ["PHOENIX", "TSUNAMI", "VIPER"];
-    const houseName = fallbackOrder[leaderboard.length];
-    leaderboard.push({
-      houseName,
-      color: getHouseColor(houseName, null),
-      gp_alltime: 0,
-    });
-  }
 
   const difficulty = getDifficulty(game.difficulty);
   const multiplierLabel = Number(game.difficulty_multiplier ?? 1).toFixed(2);
@@ -350,20 +319,13 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
 
             <div className="space-y-2 border-b-[3px] border-[#111111] px-5 py-5">
               <p className={`${plexMono.className} text-[10px] font-semibold tracking-[0.18em] text-[#777777]`}>
-                {isSpeedTap ? "YOUR BEST RUN GP" : "YOUR BEST SCORE"}
+                YOUR BEST GP
               </p>
               <p className={`${spaceGrotesk.className} text-[36px] leading-none font-bold text-[#111111]`}>
                 {toLocaleScore(userBestScore)}
               </p>
               <p className={`${plexMono.className} text-[10px] font-semibold tracking-[0.08em] text-[#777777]`}>
                 PERSONAL RECORD - KEEP PUSHING
-              </p>
-            </div>
-
-            <div className="space-y-2 border-b-[3px] border-[#333333] bg-[#111111] px-5 py-5">
-              <p className={`${plexMono.className} text-[10px] font-semibold tracking-[0.18em] text-[#FFD700]`}>HOUSE BONUS ACTIVE</p>
-              <p className={`${plexMono.className} text-xs font-semibold tracking-[0.08em] text-white`}>
-                TOP 10% EARNS DOUBLE FOR {userHouseName}
               </p>
             </div>
 

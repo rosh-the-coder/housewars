@@ -24,7 +24,8 @@ export async function POST(request: Request) {
     const gameId = String(body.game_id ?? "").trim();
     const title = String(body.title ?? "").trim();
     const ctEntryCost = Math.max(5, Math.floor(Number(body.ct_entry_cost ?? 5)));
-    const gpReward = Math.max(25, Math.floor(Number(body.gp_reward ?? 25)));
+    const maxGpReward = ctEntryCost * 10;
+    const gpReward = Math.min(maxGpReward, Math.max(25, Math.floor(Number(body.gp_reward ?? 25))));
     const durationHoursRaw = Math.floor(Number(body.duration_hours ?? 24));
     const durationHours = [12, 24, 48].includes(durationHoursRaw) ? durationHoursRaw : 24;
 
@@ -56,7 +57,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: rpcResult.error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, challenge: rpcResult.data ?? null });
+    const challengeId = (rpcResult.data as string) ?? null;
+
+    if (challengeId) {
+      const { data: creatorProfile } = await supabase
+        .from("profiles")
+        .select("house_id")
+        .eq("id", user.id)
+        .single();
+      const houseId = (creatorProfile as { house_id?: string } | null)?.house_id;
+
+      if (houseId) {
+        await supabase.from("challenge_entries").insert({
+          challenge_id: challengeId,
+          user_id: user.id,
+          house_id: houseId,
+          best_score: 0,
+          attempts: 0,
+          gp_awarded: 0,
+          rank: null,
+        });
+      }
+    }
+
+    return NextResponse.json({ success: true, challenge: challengeId });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unexpected error creating challenge" },

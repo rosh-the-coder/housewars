@@ -43,7 +43,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
     supabase
       .from("houses")
       .select("id,name,hex_code,gp_weekly,gp_alltime")
-      .order("gp_weekly", { ascending: false })
+      .order(orderColumn, { ascending: false })
       .limit(4),
     supabase
       .from("profiles")
@@ -54,7 +54,9 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
 
   const houseRows = (houses ?? []) as HouseRow[];
   const playerRows = (players ?? []) as PlayerRow[];
-  const maxHouseGp = Math.max(...houseRows.map((house) => Number(house.gp_weekly ?? 0)), 1);
+  const houseGpValue = (house: HouseRow) =>
+    Number(selectedMetric === "alltime" ? house.gp_alltime ?? 0 : house.gp_weekly ?? 0);
+  const maxHouseGp = Math.max(...houseRows.map(houseGpValue), 1);
   const medalLeftBorder = ["#FFD700", "#C0C0C0", "#CD7F32"];
 
   return (
@@ -68,18 +70,22 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
             <p className={`${jetMono.className} text-xs text-[#777777]`}>{"// season_rankings"}</p>
           </div>
           <div className="flex gap-0">
-            <button
-              type="button"
-              className={`${jetMono.className} border-[3px] border-[#0D0D0D] bg-[#0D0D0D] px-6 py-2 text-xs font-semibold text-white`}
+            <Link
+              href="/leaderboard?metric=weekly"
+              className={`${jetMono.className} border-[3px] border-[#0D0D0D] px-6 py-2 text-xs font-semibold ${
+                selectedMetric === "weekly" ? "bg-[#0D0D0D] text-white" : "bg-transparent text-[#0D0D0D]"
+              }`}
             >
-              HOUSES
-            </button>
-            <button
-              type="button"
-              className={`${jetMono.className} border-y-[3px] border-r-[3px] border-[#0D0D0D] bg-transparent px-6 py-2 text-xs font-semibold`}
+              WEEKLY GP
+            </Link>
+            <Link
+              href="/leaderboard?metric=alltime"
+              className={`${jetMono.className} border-y-[3px] border-r-[3px] border-[#0D0D0D] px-6 py-2 text-xs font-semibold ${
+                selectedMetric === "alltime" ? "bg-[#0D0D0D] text-white" : "bg-transparent text-[#0D0D0D]"
+              }`}
             >
-              PLAYERS
-            </button>
+              ALL-TIME GP
+            </Link>
           </div>
         </header>
 
@@ -92,7 +98,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
               <div
                 className="absolute inset-y-0 left-0"
                 style={{
-                  width: `${Math.max(35, Math.round((Number(house.gp_weekly ?? 0) / maxHouseGp) * 100))}%`,
+                  width: `${Math.max(35, Math.round((houseGpValue(house) / maxHouseGp) * 100))}%`,
                   background:
                     house.hex_code === "#DC2626"
                       ? "rgba(220, 38, 38, 0.2)"
@@ -113,10 +119,10 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
                 </p>
                 <div className="h-px flex-1" />
                 <div className="flex items-center gap-4">
-                  <p className={`${jetMono.className} text-[11px] font-semibold text-[#FFD700]`}>
+                  <p className={`${jetMono.className} text-[11px] font-semibold ${selectedMetric === "weekly" ? "text-[#FFD700]" : "text-[#777777]"}`}>
                     {Number(house.gp_weekly ?? 0).toLocaleString()} GP THIS WEEK
                   </p>
-                  <p className={`${jetMono.className} text-[11px] font-semibold text-[#777777]`}>
+                  <p className={`${jetMono.className} text-[11px] font-semibold ${selectedMetric === "alltime" ? "text-[#FFD700]" : "text-[#777777]"}`}>
                     {Number(house.gp_alltime ?? 0).toLocaleString()} GP ALL TIME
                   </p>
                 </div>
@@ -127,24 +133,6 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
 
         <div className="space-y-2">
           <p className={`${jetMono.className} text-xs text-[#777777]`}>{"// player_rankings"}</p>
-          <div className="flex gap-0">
-            <Link
-              href="/leaderboard?metric=weekly"
-              className={`${jetMono.className} border-[3px] border-[#0D0D0D] px-5 py-2 text-xs font-semibold ${
-                selectedMetric === "weekly" ? "bg-[#0D0D0D] text-white" : "bg-transparent text-[#0D0D0D]"
-              }`}
-            >
-              WEEKLY GP
-            </Link>
-            <Link
-              href="/leaderboard?metric=alltime"
-              className={`${jetMono.className} border-y-[3px] border-r-[3px] border-[#0D0D0D] px-5 py-2 text-xs font-semibold ${
-                selectedMetric === "alltime" ? "bg-[#0D0D0D] text-white" : "bg-transparent text-[#0D0D0D]"
-              }`}
-            >
-              ALL-TIME GP
-            </Link>
-          </div>
           <div className="overflow-x-auto border-[3px] border-[#0D0D0D]">
             <table className="w-full min-w-[900px] border-collapse">
               <thead className={`${jetMono.className} bg-[#0D0D0D] text-xs font-semibold text-white`}>

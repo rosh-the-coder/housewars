@@ -52,6 +52,7 @@ export async function ensureSpeedTapGame(supabase: MinimalSupabase): Promise<voi
         difficulty: "medium",
         difficulty_multiplier: 1.0,
         ct_reward: 25,
+        pts_per_minute: 0,
         is_scored: true,
         is_active: true,
       })
@@ -74,6 +75,7 @@ export async function ensureSpeedTapGame(supabase: MinimalSupabase): Promise<voi
       difficulty: "medium",
       difficulty_multiplier: 1.0,
       ct_reward: 25,
+      pts_per_minute: 0,
       is_scored: true,
       is_active: true,
     })

@@ -29,6 +29,7 @@ export type Game = {
   difficulty: string;
   difficulty_multiplier: number;
   ct_reward: number;
+  pts_per_minute: number;
   is_scored: boolean;
   is_active: boolean;
 };

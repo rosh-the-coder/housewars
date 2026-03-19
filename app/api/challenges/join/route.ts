@@ -53,36 +53,37 @@ export async function POST(request: Request) {
     if (profileError || !profile) {
       return NextResponse.json({ error: profileError?.message ?? "Profile not found" }, { status: 404 });
     }
-    if (!profile.house_id) {
+    if (!(profile as { house_id?: string }).house_id) {
       return NextResponse.json({ error: "Please choose a house first" }, { status: 400 });
     }
 
-    const entryCost = Math.max(0, Number(challenge.ct_entry_cost ?? 0));
-    const currentCt = Number(profile.challenge_tokens ?? 0);
+    const entryCost = Math.max(0, Number((challenge as { ct_entry_cost?: number }).ct_entry_cost ?? 0));
+    const currentCt = Number((profile as { challenge_tokens?: number }).challenge_tokens ?? 0);
     if (currentCt < entryCost) {
       return NextResponse.json({ error: "Insufficient CT balance" }, { status: 400 });
     }
 
-    const { error: tokenError } = await supabase
-      .from("profiles")
-      .update({ challenge_tokens: currentCt - entryCost })
-      .eq("id", user.id);
-    if (tokenError) {
-      return NextResponse.json({ error: tokenError.message }, { status: 500 });
+    const { error: deductError } = await supabase.rpc("increment_profile_points", {
+      p_user_id: user.id,
+      p_gp: 0,
+      p_ct: -entryCost,
+    });
+    if (deductError) {
+      return NextResponse.json({ error: deductError.message }, { status: 500 });
     }
 
-    const { error: challengeUpdateError } = await supabase
-      .from("challenges")
-      .update({ ct_pool: Number(challenge.ct_pool ?? 0) + entryCost })
-      .eq("id", challengeId);
-    if (challengeUpdateError) {
-      return NextResponse.json({ error: challengeUpdateError.message }, { status: 500 });
+    const { error: poolError } = await supabase.rpc("increment_challenge_pool", {
+      p_challenge_id: challengeId,
+      p_amount: entryCost,
+    });
+    if (poolError) {
+      return NextResponse.json({ error: poolError.message }, { status: 500 });
     }
 
     const { error: entryError } = await supabase.from("challenge_entries").insert({
       challenge_id: challengeId,
       user_id: user.id,
-      house_id: profile.house_id,
+      house_id: (profile as { house_id: string }).house_id,
       best_score: 0,
       attempts: 0,
       gp_awarded: 0,

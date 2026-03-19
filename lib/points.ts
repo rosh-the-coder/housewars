@@ -45,7 +45,7 @@ export function resolveBasePoints(input: {
   if (hasMetric) {
     if (normalizedMetricType.startsWith("time")) {
       pointsFromMetric = resolveTimeMetricPoints(metricNum, normalizedMetricType);
-      rawScore = pointsFromMetric * 10;
+      rawScore = Math.max(0, Math.round(metricNum));
     } else {
       rawScore = Math.max(0, Math.round(metricNum));
     }
