@@ -41,7 +41,7 @@ export default async function ProfilePage() {
       "id,username,gp_alltime,gp_weekly,challenge_tokens,total_games_played,top10_finishes,weekly_wins,house:houses(name,hex_code)",
     )
     .eq("id", user.id)
-    .maybeSingle<ProfileRow>();
+    .maybeSingle();
 
   if (!profile) {
     redirect("/signup?error=Complete signup to create your profile");
@@ -75,7 +75,7 @@ export default async function ProfilePage() {
   const house = Array.isArray(profile.house) ? profile.house[0] : profile.house;
   const username = profile.username ?? user.email?.split("@")[0] ?? "player";
 
-  const recentResults = (recentResultsResult.data ?? []).map((row) => {
+  const recentResults = (recentResultsResult.data ?? []).map((row: any) => {
     const parsed = row as {
       id?: string;
       rank?: number | null;
@@ -97,7 +97,7 @@ export default async function ProfilePage() {
     };
   });
 
-  const challengeHistory = (challengeHistoryResult.data ?? []).map((row) => {
+  const challengeHistory = (challengeHistoryResult.data ?? []).map((row: any) => {
     const parsed = row as {
       id?: string;
       rank?: number | null;
@@ -127,7 +127,7 @@ export default async function ProfilePage() {
     };
   });
 
-  const badges = (badgeRowsResult.data ?? []).map((row) => {
+  const badges = (badgeRowsResult.data ?? []).map((row: any) => {
     const parsed = row as {
       badge?: { name?: string | null } | { name?: string | null }[] | null;
     };

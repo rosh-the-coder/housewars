@@ -39,7 +39,7 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
       "id,username,gp_alltime,gp_weekly,challenge_tokens,total_games_played,top10_finishes,weekly_wins,house:houses(name,hex_code)",
     )
     .eq("username", username)
-    .maybeSingle<ProfileRow>();
+    .maybeSingle();
 
   if (!profile) {
     notFound();
@@ -72,7 +72,7 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
 
   const house = Array.isArray(profile.house) ? profile.house[0] : profile.house;
 
-  const recentResults = (recentResultsResult.data ?? []).map((row) => {
+  const recentResults = (recentResultsResult.data ?? []).map((row: any) => {
     const parsed = row as {
       id?: string;
       rank?: number | null;
@@ -94,7 +94,7 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
     };
   });
 
-  const challengeHistory = (challengeHistoryResult.data ?? []).map((row) => {
+  const challengeHistory = (challengeHistoryResult.data ?? []).map((row: any) => {
     const parsed = row as {
       id?: string;
       rank?: number | null;
@@ -125,7 +125,7 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
   });
 
   const badges = (badgeRowsResult.data ?? [])
-    .map((row) => {
+    .map((row: any) => {
       const parsed = row as {
         badge?: { name?: string | null } | { name?: string | null }[] | null;
       };

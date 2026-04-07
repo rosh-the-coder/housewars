@@ -21,8 +21,8 @@ export async function POST(request: Request) {
   });
 
   if (error) {
-    return NextResponse.redirect(new URL("/dashboard?error=Could not complete welcome flow", request.url));
+    return NextResponse.redirect(new URL("/games?error=Could not complete welcome flow", request.url));
   }
 
-  return NextResponse.redirect(new URL("/dashboard", request.url));
+  return NextResponse.redirect(new URL("/games", request.url));
 }

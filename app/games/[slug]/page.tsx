@@ -112,7 +112,7 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
     .from("profiles")
     .select("id,username,house_id,house:houses(name,hex_code)")
     .eq("id", user.id)
-    .maybeSingle<ProfileRow>();
+    .maybeSingle();
   const userProfile = profileAttempt.data;
   const currentHouse = Array.isArray(userProfile?.house) ? userProfile?.house[0] : userProfile?.house;
   const userName = (userProfile?.username ?? user.email?.split("@")[0] ?? "player").toUpperCase();
@@ -144,15 +144,15 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
 
   const { data: houseRows } = await supabase
     .from("houses")
-    .select("id,name,hex_code,gp_alltime")
-    .order("gp_alltime", { ascending: false })
+    .select("id,name,hex_code,gp_weekly")
+    .order("gp_weekly", { ascending: false })
     .limit(4);
 
-  const leaderboard = ((houseRows ?? []) as { id: string; name: string; hex_code: string | null; gp_alltime: number | null }[])
+  const leaderboard = ((houseRows ?? []) as { id: string; name: string; hex_code: string | null; gp_weekly: number | null }[])
     .map((h) => ({
       houseName: normalizeHouseName(h.name),
       color: h.hex_code ?? getHouseColor(h.name, null),
-      gp_alltime: Number(h.gp_alltime ?? 0),
+      gp_weekly: Number(h.gp_weekly ?? 0),
     }))
     .slice(0, 3);
 
@@ -331,7 +331,7 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
 
             <div className="flex h-10 items-center justify-between border-b-2 border-[#DDDDDD] px-5">
               <p className={`${plexMono.className} text-[10px] font-semibold tracking-[0.18em] text-[#777777]`}>HOUSE LEADERBOARD</p>
-              <p className={`${plexMono.className} text-[10px] font-semibold tracking-[0.08em] text-[#777777]`}>THIS GAME</p>
+              <p className={`${plexMono.className} text-[10px] font-semibold tracking-[0.08em] text-[#777777]`}>WEEKLY GP</p>
             </div>
 
             {leaderboard.map((row, idx) => (
@@ -342,7 +342,7 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
                   <span className={`${plexMono.className} text-xs font-bold tracking-[0.08em] text-[#111111]`}>{row.houseName}</span>
                 </div>
                 <span className={`${spaceGrotesk.className} text-sm font-bold text-[#111111]`}>
-                  {toLocaleScore(row.gp_alltime)}
+                  {toLocaleScore(row.gp_weekly)}
                 </span>
               </div>
             ))}

@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/lib/database.types";
 
-export async function createSupabaseServerClient() {
+export async function createSupabaseServerClient(): Promise<any> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -27,5 +27,5 @@ export async function createSupabaseServerClient() {
         }
       },
     },
-  });
+  }) as any;
 }

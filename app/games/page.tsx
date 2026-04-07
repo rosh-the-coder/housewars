@@ -16,7 +16,6 @@ type DbGame = {
   is_active: boolean;
 };
 
-const TEST_GAME_EMBED_URL = "https://html5.gamedistribution.com/305d2a5605784aaf8587ffefc765e5cf/";
 const GAME_THUMBNAIL_V1: Record<string, string> = {
   "Speed Tap": "/thumbnails/Speed%20Tap%201.png",
   "Word Scramble": "/thumbnails/Word%20Scramble%201.jpeg",
@@ -49,11 +48,6 @@ export default async function GamesLobbyPage() {
     const bIsLocalSpeedTap = b.embed_url === SPEED_TAP_EMBED_URL;
     if (aIsLocalSpeedTap && !bIsLocalSpeedTap) return -1;
     if (!aIsLocalSpeedTap && bIsLocalSpeedTap) return 1;
-
-    const aIsTest = a.embed_url.startsWith(TEST_GAME_EMBED_URL);
-    const bIsTest = b.embed_url.startsWith(TEST_GAME_EMBED_URL);
-    if (aIsTest && !bIsTest) return -1;
-    if (!aIsTest && bIsTest) return 1;
     return a.name.localeCompare(b.name);
   });
 
@@ -114,7 +108,7 @@ export default async function GamesLobbyPage() {
                       loading="lazy"
                     />
                   ) : null}
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-black/15 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                  <div className="pointer-events-none absolute inset-0 bg-linear-to-tr from-black/15 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                 </div>
                 <div className="space-y-2 p-4">
                   <h2

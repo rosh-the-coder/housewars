@@ -1,22 +1,70 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { jetMono, oswald } from "@/lib/fonts";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const houseCards = [
-  { name: "PHOENIX", color: "#DC2626", gp_alltime: "12,450 GP", members: "342 MEMBERS" },
-  { name: "TSUNAMI", color: "#2563EB", gp_alltime: "11,890 GP", members: "318 MEMBERS" },
-  { name: "VIPER", color: "#16A34A", gp_alltime: "10,720 GP", members: "295 MEMBERS" },
-  { name: "THUNDER", color: "#CA8A04", gp_alltime: "9,980 GP", members: "287 MEMBERS" },
-];
+export const dynamic = "force-dynamic";
 
-const topPlayers = [
-  { rank: "#1", username: "xDarkSlayer", house: "PHOENIX", gp_alltime: "4,892", color: "#DC2626" },
-  { rank: "#2", username: "TidalCrusher", house: "TSUNAMI", gp_alltime: "4,651", color: "#2563EB" },
-  { rank: "#3", username: "VenomStrike99", house: "VIPER", gp_alltime: "4,210", color: "#16A34A" },
-  { rank: "#4", username: "BoltMaster", house: "THUNDER", gp_alltime: "3,987", color: "#CA8A04" },
-  { rank: "#5", username: "FlameRider", house: "PHOENIX", gp_alltime: "3,745", color: "#DC2626" },
-];
+type HouseRow = {
+  id: string;
+  name: string;
+  hex_code: string | null;
+  gp_alltime: number | null;
+};
 
-export default function Home() {
+type PublicProfileCountRow = {
+  id: string;
+  house_id: string | null;
+};
+
+type PublicPlayerRow = {
+  id: string;
+  username: string | null;
+  gp_alltime: number | null;
+  house:
+    | {
+        name: string;
+        hex_code: string | null;
+      }[]
+    | {
+        name: string;
+        hex_code: string | null;
+      }
+    | null;
+};
+
+export default async function Home() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    redirect("/games");
+  }
+
+  const [{ data: houses }, { data: profiles }, { data: topPlayers }] = await Promise.all([
+    supabase
+      .from("houses")
+      .select("id,name,hex_code,gp_alltime")
+      .order("gp_alltime", { ascending: false })
+      .limit(4),
+    supabase.from("profiles").select("id,house_id"),
+    supabase
+      .from("profiles")
+      .select("id,username,gp_alltime,house:houses(name,hex_code)")
+      .order("gp_alltime", { ascending: false })
+      .limit(5),
+  ]);
+
+  const houseRows = (houses ?? []) as HouseRow[];
+  const profileRows = (profiles ?? []) as PublicProfileCountRow[];
+  const topPlayerRows = (topPlayers ?? []) as PublicPlayerRow[];
+  const membersByHouseId = new Map<string, number>();
+  for (const profile of profileRows) {
+    if (!profile.house_id) continue;
+    membersByHouseId.set(profile.house_id, (membersByHouseId.get(profile.house_id) ?? 0) + 1);
+  }
+
   return (
     <section className="bg-[#F5F5F0] text-[#111111]">
       <div className="px-4 py-14 md:px-10 md:py-16">
@@ -30,21 +78,23 @@ export default function Home() {
       </div>
 
       <div className="grid gap-6 px-4 pb-10 md:grid-cols-2 md:px-10 xl:grid-cols-4">
-        {houseCards.map((house) => (
+        {houseRows.map((house) => (
           <article
-            key={house.name}
+            key={house.id}
             className="flex flex-col items-center gap-3 border-[3px] border-solid bg-[#F5F5F0] p-6 text-center"
-            style={{ borderColor: house.color }}
+            style={{ borderColor: house.hex_code ?? "#111111" }}
           >
             <h2
               className={`${oswald.className} text-3xl leading-none tracking-[0.08em]`}
-              style={{ color: house.color }}
+              style={{ color: house.hex_code ?? "#111111" }}
             >
-              {house.name}
+              {house.name.toUpperCase()}
             </h2>
-            <p className={`${oswald.className} text-4xl leading-none`}>{house.gp_alltime}</p>
+            <p className={`${oswald.className} text-4xl leading-none`}>
+              {Number(house.gp_alltime ?? 0).toLocaleString()} GP
+            </p>
             <p className={`${jetMono.className} text-xs font-semibold tracking-[0.08em] text-[#777777]`}>
-              {house.members}
+              {Number(membersByHouseId.get(house.id) ?? 0).toLocaleString()} MEMBERS
             </p>
           </article>
         ))}
@@ -68,20 +118,26 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody>
-                {topPlayers.map((player) => (
-                  <tr key={player.rank} className="border-t border-[#DDDDDD]">
-                    <td className={`${jetMono.className} px-4 py-4 text-sm font-bold`}>{player.rank}</td>
+                {topPlayerRows.map((player, index) => {
+                  const house = Array.isArray(player.house) ? player.house[0] : player.house;
+                  return (
+                  <tr key={player.id} className="border-t border-[#DDDDDD]">
+                    <td className={`${jetMono.className} px-4 py-4 text-sm font-bold`}>#{index + 1}</td>
                     <td className={`${jetMono.className} px-4 py-4 text-sm font-semibold`}>
-                      {player.username}
+                      {player.username ?? "player"}
                     </td>
-                    <td className={`${jetMono.className} px-4 py-4 text-sm font-bold`} style={{ color: player.color }}>
-                      {player.house}
+                    <td
+                      className={`${jetMono.className} px-4 py-4 text-sm font-bold`}
+                      style={{ color: house?.hex_code ?? "#111111" }}
+                    >
+                      {(house?.name ?? "HOUSE").toUpperCase()}
                     </td>
                     <td className={`${jetMono.className} px-4 py-4 text-right text-sm font-bold`}>
-                      {player.gp_alltime}
+                      {Number(player.gp_alltime ?? 0).toLocaleString()}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

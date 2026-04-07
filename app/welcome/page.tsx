@@ -44,17 +44,17 @@ export default async function WelcomePage() {
     (user.user_metadata as { welcome_seen?: boolean } | undefined)?.welcome_seen,
   );
   if (welcomeSeen) {
-    redirect("/dashboard");
+    redirect("/games");
   }
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("id,house:houses(name,hex_code)")
     .eq("id", user.id)
-    .maybeSingle<ProfileRow>();
+    .maybeSingle();
 
   if (!profile?.house) {
-    redirect("/dashboard");
+    redirect("/games");
   }
 
   const house = getHouseDisplay(profile.house.name, profile.house.hex_code);

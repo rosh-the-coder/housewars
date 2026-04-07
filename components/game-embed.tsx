@@ -34,6 +34,11 @@ type HouseWarsGameOverMessage = {
 type SessionEndPayload = {
   rank?: number | string | null;
   total_players?: number | null;
+  weekly_rank?: number | null;
+  weekly_total_players?: number | null;
+  alltime_rank?: number | null;
+  alltime_total_players?: number | null;
+  rank_metric?: string;
   gp_earned?: number;
   ct_earned?: number;
   weekly_gp_total?: number;
@@ -76,6 +81,8 @@ export function GameEmbed({
     challengeRank: number | null;
     challengeTotalPlayers: number;
     challengeBestScore: number;
+    alltimeRank: number | null;
+    alltimeTotalPlayers: number;
   }>({
     rank: "-",
     totalPlayers: 0,
@@ -89,6 +96,8 @@ export function GameEmbed({
     challengeRank: null,
     challengeTotalPlayers: 0,
     challengeBestScore: 0,
+    alltimeRank: null,
+    alltimeTotalPlayers: 0,
   });
   const [dismissCountdown, setDismissCountdown] = useState(10);
   const [modalOpenedAtMs, setModalOpenedAtMs] = useState<number | null>(null);
@@ -173,8 +182,8 @@ export function GameEmbed({
       setDismissCountdown(10);
       setModalOpenedAtMs(Date.now());
       setResult({
-        rank: payload.rank ?? "-",
-        totalPlayers: Number(payload.total_players ?? 0),
+        rank: payload.weekly_rank ?? payload.rank ?? "-",
+        totalPlayers: Number(payload.weekly_total_players ?? payload.total_players ?? 0),
         placementPoints: Math.max(0, Math.round(Number(payload.gp_earned ?? 0))),
         difficultyMultiplier: Number(payload.multiplier ?? 1),
         gpEarned: Number(payload.gp_earned ?? 0),
@@ -185,6 +194,8 @@ export function GameEmbed({
         challengeRank: Number(challengeStats?.rank ?? 0) || null,
         challengeTotalPlayers: Number(challengeStats?.total_players ?? 0),
         challengeBestScore: Number(challengeStats?.best_score ?? 0),
+        alltimeRank: Number(payload.alltime_rank ?? 0) || null,
+        alltimeTotalPlayers: Number(payload.alltime_total_players ?? 0),
       });
       setIsResultModalOpen(true);
       router.refresh();
@@ -299,7 +310,10 @@ export function GameEmbed({
 
             <div className="border-b-[3px] border-[#0D0D0D] px-5 py-3">
               <p className="text-sm font-semibold tracking-[0.08em] text-[#F5F5F0]">
-                RANK #{result.rank} OF {result.totalPlayers} PLAYERS
+                WEEKLY RANK #{result.rank} OF {result.totalPlayers} PLAYERS
+              </p>
+              <p className="mt-2 text-xs font-semibold tracking-[0.08em] text-[#777777]">
+                ALL-TIME RANK #{result.alltimeRank ?? "--"} OF {result.alltimeTotalPlayers || "--"}
               </p>
               {challengeContext?.id ? (
                 <p className="mt-2 text-xs font-semibold tracking-[0.08em] text-[#00D4AA]">

@@ -24,7 +24,7 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const ranked = (data ?? []).map((row, idx) => {
+    const ranked = (data ?? []).map((row: any, idx: number) => {
       const parsed = row as {
         id?: string;
         user_id?: string;

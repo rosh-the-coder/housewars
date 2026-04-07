@@ -41,11 +41,13 @@ export async function POST(request: Request) {
     if (profileError || !profile) {
       return NextResponse.json({ error: profileError?.message ?? "Profile not found" }, { status: 400 });
     }
-    if (Number(profile.challenge_tokens ?? 0) < ctEntryCost) {
+    const currentCt = Number((profile as { challenge_tokens?: number } | null)?.challenge_tokens ?? 0);
+    if (currentCt < ctEntryCost) {
       return NextResponse.json({ error: "Insufficient CT balance" }, { status: 400 });
     }
 
-    const rpcResult = await supabase.rpc("create_challenge", {
+    const db = supabase as any;
+    const rpcResult = await db.rpc("create_challenge", {
       p_creator_id: user.id,
       p_game_id: gameId,
       p_title: title,
@@ -68,7 +70,7 @@ export async function POST(request: Request) {
       const houseId = (creatorProfile as { house_id?: string } | null)?.house_id;
 
       if (houseId) {
-        await supabase.from("challenge_entries").insert({
+        await db.from("challenge_entries").insert({
           challenge_id: challengeId,
           user_id: user.id,
           house_id: houseId,

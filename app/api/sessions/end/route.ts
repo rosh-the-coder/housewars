@@ -24,6 +24,12 @@ type GameRow = {
   difficulty_multiplier: number | null;
 };
 
+type ProfileRankRow = {
+  id: string;
+  gp_weekly: number | null;
+  gp_alltime: number | null;
+};
+
 async function resolveHouseInfo(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, userId: string) {
   const profileAttempt = await supabase
     .from("profiles")
@@ -73,7 +79,7 @@ export async function POST(request: Request) {
       .from("game_sessions")
       .select("id,user_id,game_id,started_at,ended_at,raw_score,gp_earned,ct_earned")
       .eq("id", sessionId)
-      .single<SessionRow>();
+      .single();
 
     if (sessionError || !session) {
       return NextResponse.json(
@@ -99,7 +105,7 @@ export async function POST(request: Request) {
       .from("games")
       .select("id,name,is_scored,ct_reward,pts_per_minute,difficulty_multiplier")
       .eq("id", session.game_id)
-      .single<GameRow>();
+      .single();
 
     if (gameError || !game) {
       return NextResponse.json(
@@ -167,7 +173,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: houseAwardError.message }, { status: 500 });
     }
 
-    const [profileResult, rankAttempt] = await Promise.all([
+    const [profileResult, weeklyRankAttempt, alltimeRankAttempt] = await Promise.all([
       supabase
         .from("profiles")
         .select("gp_weekly,challenge_tokens")
@@ -175,8 +181,14 @@ export async function POST(request: Request) {
         .single(),
       supabase
         .from("profiles")
-        .select("id,gp_alltime")
-        .order("gp_alltime", { ascending: false }),
+        .select("id,gp_weekly,gp_alltime")
+        .order("gp_weekly", { ascending: false })
+        .order("id", { ascending: true }),
+      supabase
+        .from("profiles")
+        .select("id,gp_weekly,gp_alltime")
+        .order("gp_alltime", { ascending: false })
+        .order("id", { ascending: true }),
     ]);
 
     const updatedProfile = profileResult.data as {
@@ -184,12 +196,37 @@ export async function POST(request: Request) {
       challenge_tokens?: number;
     } | null;
 
-    const rank =
-      (rankAttempt.data ?? []).findIndex(
-        (row) => (row as { id?: string }).id === user.id,
-      ) + 1;
+    const weeklyRows = (weeklyRankAttempt.data ?? []) as ProfileRankRow[];
+    const alltimeRows = (alltimeRankAttempt.data ?? []) as ProfileRankRow[];
+    const weeklyRank = weeklyRows.findIndex((row) => row.id === user.id) + 1;
+    const alltimeRank = alltimeRows.findIndex((row) => row.id === user.id) + 1;
 
-    revalidatePath("/dashboard");
+    const [sameGameRunsAttempt, betterGameRunsAttempt] = await Promise.all([
+      supabase
+        .from("game_sessions")
+        .select("id", { count: "exact", head: true })
+        .eq("game_id", game.id)
+        .not("ended_at", "is", null),
+      supabase
+        .from("game_sessions")
+        .select("id", { count: "exact", head: true })
+        .eq("game_id", game.id)
+        .not("ended_at", "is", null)
+        .gt("gp_earned", gpEarned),
+    ]);
+    const gameTotalPlayers = Number(sameGameRunsAttempt.count ?? 0);
+    const gameRankBase = Number(betterGameRunsAttempt.count ?? 0);
+    const gameRank = gameTotalPlayers > 0 ? gameRankBase + 1 : null;
+
+    await supabase.from("game_results").insert({
+      user_id: user.id,
+      game_id: game.id,
+      gp_earned: gpEarned,
+      ct_earned: ctEarned,
+      rank: gameRank,
+      total_players: gameTotalPlayers > 0 ? gameTotalPlayers : null,
+    });
+
     revalidatePath("/games");
     revalidatePath(`/games/${slugify(game.name)}`);
     revalidatePath("/leaderboard");
@@ -198,8 +235,13 @@ export async function POST(request: Request) {
       gp_earned: gpEarned,
       ct_earned: ctEarned,
       multiplier,
-      rank: rank > 0 ? rank : null,
-      total_players: (rankAttempt.data ?? []).length,
+      rank: weeklyRank > 0 ? weeklyRank : null,
+      total_players: weeklyRows.length,
+      weekly_rank: weeklyRank > 0 ? weeklyRank : null,
+      weekly_total_players: weeklyRows.length,
+      alltime_rank: alltimeRank > 0 ? alltimeRank : null,
+      alltime_total_players: alltimeRows.length,
+      rank_metric: "weekly_gp",
       weekly_gp_total: Number(updatedProfile?.gp_weekly ?? 0),
       ct_balance: Number(updatedProfile?.challenge_tokens ?? 0),
       house_color: houseColor,

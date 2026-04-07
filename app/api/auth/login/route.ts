@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const welcomeSeen = Boolean(
       (data.user?.user_metadata as { welcome_seen?: boolean } | undefined)?.welcome_seen,
     );
-    return NextResponse.redirect(new URL(welcomeSeen ? "/dashboard" : "/welcome", request.url));
+    return NextResponse.redirect(new URL(welcomeSeen ? "/games" : "/welcome", request.url));
   } catch (error) {
     return redirectWithMessage(
       request,

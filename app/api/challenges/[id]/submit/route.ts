@@ -100,7 +100,7 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     revalidatePath("/challenges");
-    revalidatePath("/dashboard");
+    revalidatePath("/games");
 
     return NextResponse.json({
       challenge_id: challengeId,

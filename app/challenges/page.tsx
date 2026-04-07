@@ -78,7 +78,7 @@ export default async function ChallengesPage() {
         .from("profiles")
         .select("id,challenge_tokens,house:houses(hex_code)")
         .eq("id", user.id)
-        .maybeSingle<ProfileRow>(),
+        .maybeSingle(),
       supabase
         .from("challenges")
         .select("id,title,game_id,gp_reward,ct_entry_cost,min_participants,ends_at,status,game:games(name)")
@@ -193,7 +193,7 @@ export default async function ChallengesPage() {
     };
   });
 
-  const gameOptions = (games ?? []).map((row) => {
+  const gameOptions = (games ?? []).map((row: any) => {
     const game = row as { id?: string; name?: string | null };
     return { id: String(game.id ?? ""), name: String(game.name ?? "Game") };
   });
