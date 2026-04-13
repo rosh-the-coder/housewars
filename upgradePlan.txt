@@ -1,0 +1,131 @@
+ou’re thinking in exactly the right direction.
+For this type of game, the mini-games are not the product — the meta-progression + social competition is the product.
+
+If players only “play one round and leave,” it usually means:
+
+no short-term goal,
+no medium-term progression,
+no social pressure/rivalry,
+no reason to return tomorrow.
+What works in games like this (common trends)
+1) Multi-layer progression (most important)
+Players stay when there are 3 time horizons:
+
+Session goal (5-10 min): “Finish today’s mission”, “Beat my best in this game”
+Daily goal (1 day): streaks, daily quests, daily chest
+Season goal (1-4 weeks): rank climb, house war, season rewards
+If you only have one layer (play game -> get points), churn is high.
+
+2) Social competition > pure score grinding
+People return for:
+
+rivalry (“I’m 2 places behind X”),
+contribution (“my house needs 500 GP to overtake”),
+recognition (“MVP of the day”, “Top improver”).
+Leaderboards alone are not enough; they need context + closeness.
+
+3) Controlled novelty cadence
+You don’t need many games; you need rotating goals:
+
+weekly featured game,
+rotating modifiers (“double CT in Game X today”),
+weekend tournaments,
+challenge-of-the-day.
+This prevents “same thing every day” fatigue.
+
+4) Reward design that feels fair
+Reward systems fail when either:
+
+rewards are too flat (no excitement),
+or too spiky/pay-to-win (people quit).
+Good model:
+
+predictable base rewards,
+small bonus rewards for skill/improvement,
+periodic milestone payouts.
+“Level-by-level” engagement model for HouseWars
+Use this exact engagement ladder:
+
+Level 1 — Foundation (must-have retention)
+Daily missions (3 per day)
+7-day streak with escalating CT
+Weekly house race with visible countdown
+Personal best + “you improved by X%”
+Goal: player has reason to return tomorrow.
+
+Level 2 — Competitive loop
+Rival system (“nearest 3 players above/below you”)
+House contribution meter (“your GP this week for house”)
+Challenge leaderboard clearly visible in challenges page
+Weekly MVP badges (cosmetic/title, not power)
+Goal: player cares about beating someone, not just collecting points.
+
+Level 3 — Mastery loop
+Game-specific mastery tracks (e.g., Speed Tap Tier 1-10)
+Milestones: first 1k GP, 10 challenge wins, top 10 finish, etc.
+Improvement rewards (bonus for setting new personal best)
+Goal: skilled players keep grinding for mastery.
+
+Level 4 — Event loop (re-engagement)
+Weekend event mode
+Limited-time house missions
+“Comeback bonuses” for inactive users (light touch)
+Goal: revive dormant players.
+
+Incentive types that work best here
+Status incentives: titles, badges, “House Hero” role, featured player
+Progress incentives: levels, mastery bars, unlock tracks
+Economic incentives: CT boosts, mission reward multipliers
+Social incentives: house chat/feed, rivalry card, team milestones
+Scarcity incentives: weekly resets, season-exclusive cosmetics
+Avoid over-relying on just CT/GP numbers.
+
+Practical anti-boredom formula
+For each week, ensure:
+
+1 new reason to log in
+1 new reason to compete
+1 new reason to improve
+1 new reason to care about house outcome
+If any one of those is missing, engagement drops.
+
+Metrics to track (to know if this is working)
+D1 / D7 retention
+Avg sessions per active user/day
+Challenge participation rate
+% users completing at least 1 daily mission
+% users with 3+ day streak
+Weekly active users contributing to house GP
+If these rise, your progression system is working.
+
+If you want, I can now draft a concrete progression design doc for HouseWars with:
+
+exact daily mission templates,
+level curve (XP/GP thresholds),
+weekly/season reward tables,
+and balance-safe CT/GP economy numbers.
+
+
+Short answer: no — not all at launch.
+
+For a project like HouseWars, shipping everything at once usually slows you down and makes balancing messy.
+Better approach: launch with a focused core loop, then add engagement layers in stages.
+
+What should be in launch (must-have)
+Smooth auth/onboarding
+Reliable game session scoring (GP/CT)
+One clear competitive loop (weekly house race)
+Basic challenges (create/join/submit + leaderboard)
+Personal progress visibility (rank, best GP, streak/missions or season race — at least one)
+What should come right after launch (2-6 weeks)
+Daily missions + streaks
+Better challenge variety
+Rival/friends pressure (duels, near-rank rivals)
+Reward cosmetics/badges
+Season-end recap + rewards
+Why this is better
+You validate retention drivers with real users
+You can tune economy (GP/CT) before adding more sinks/sources
+Less risk of a bloated launch that feels confusing
+So yes, those systems are important — but as a roadmap around launch, not necessarily all in v1 launch day.
+

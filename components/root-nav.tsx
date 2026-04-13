@@ -74,9 +74,9 @@ export function RootNav({
   }
 
   const routeMeta = getRouteMeta(pathname, user.isLoggedIn);
-  const navFill = routeMeta.tone === "war" ? "#DC2626" : "#F5F5F0";
-  const navText = routeMeta.tone === "war" ? "#FFFFFF" : "#111111";
-  const borderColor = routeMeta.tone === "war" ? "#0D0D0D" : "#000000";
+  const navFill = "#F5F5F0";
+  const navText = "#111111";
+  const borderColor = "#000000";
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
@@ -90,8 +90,8 @@ export function RootNav({
   const challengeTokenValue = Number(
     user.challenge_tokens ?? 0,
   ).toLocaleString();
-  const avatarBg = routeMeta.tone === "war" ? "#F5F5F0" : "#111111";
-  const avatarText = routeMeta.tone === "war" ? "#111111" : "#F5F5F0";
+  const avatarBg = "#111111";
+  const avatarText = "#F5F5F0";
 
   const navLinkClass = (href: string) => {
     const active = isActive(href);
@@ -236,33 +236,6 @@ export function RootNav({
                         </span>
                       </div>
                     </div>
-                    <Link
-                      href="/games"
-                      role="menuitem"
-                      className={`${jetMono.className} block border-b-2 border-[#111111] px-4 py-2.5 text-[11px] font-semibold hover:bg-[#EBEBE7]`}
-                      style={{ color: "#111111" }}
-                      onClick={() => setProfileMenuOpen(false)}
-                    >
-                      HOME
-                    </Link>
-                    <Link
-                      href="/challenges"
-                      role="menuitem"
-                      className={`${jetMono.className} block border-b-2 border-[#111111] px-4 py-2.5 text-[11px] font-semibold hover:bg-[#EBEBE7]`}
-                      style={{ color: "#111111" }}
-                      onClick={() => setProfileMenuOpen(false)}
-                    >
-                      CHALLENGES
-                    </Link>
-                    <Link
-                      href="/leaderboard"
-                      role="menuitem"
-                      className={`${jetMono.className} block border-b-2 border-[#111111] px-4 py-2.5 text-[11px] font-semibold hover:bg-[#EBEBE7]`}
-                      style={{ color: "#111111" }}
-                      onClick={() => setProfileMenuOpen(false)}
-                    >
-                      LEADERBOARD
-                    </Link>
                     <Link
                       href="/profile"
                       role="menuitem"
